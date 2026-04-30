@@ -7,4 +7,7 @@
 *.bbl
 *.fls
 *.fdb_latexmk
+*.blg
+*.xdv
 main.pdf
+ref-mapping.csv
