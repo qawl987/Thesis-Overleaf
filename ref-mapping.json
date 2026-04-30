@@ -1,0 +1,87 @@
+[
+  {
+    "name": "Ordonez-Lucena, J., Ameigeiras, P., Contreras, L. M., Folgueira, J., & López, D. R. (2021). On the Rollout of Network Slicing in Carrier Networks: A Technology Radar. Sensors, 21(23), 8094. https://doi.org/10.3390/s21238094",
+    "url": "https://www.mdpi.com/1424-8220/21/23/8094",
+    "ref_name": "ordonez2021rollout"
+  },
+  {
+    "name": "ETSI GS NFV 006 V4.5.1",
+    "url": "https://www.etsi.org/deliver/etsi_gs/NFV/001_099/006/04.05.01_60/gs_NFV006v040501p.pdf",
+    "ref_name": "etsi_nfv_mano"
+  },
+  {
+    "name": "ETSI TS 128 533 V17.2.0",
+    "url": "https://www.etsi.org/deliver/etsi_ts/128500_128599/128533/17.02.00_60/ts_128533v170200p.pdf",
+    "ref_name": "3gpp_ts28533"
+  },
+  {
+    "name": "ETSI TS 128 312 V18.4.0",
+    "url": "https://www.etsi.org/deliver/etsi_ts/128300_128399/128312/18.04.00_60/ts_128312v180400p.pdf",
+    "ref_name": "3gpp_ts28312"
+  },
+  {
+    "name": "ETSI TS 123 501 V15.5.0",
+    "url": "https://www.etsi.org/deliver/etsi_ts/123500_123599/123501/15.05.00_60/ts_123501v150500p.pdf",
+    "ref_name": "3gpp_ts23501"
+  },
+  {
+    "name": "",
+    "url": "https://docs.srsran.com/projects/project/en/latest/knowledge_base/source/oran_gnb/source/index.html",
+    "ref_name": "srsran_oran_gnb_doc"
+  },
+  {
+    "name": "",
+    "url": "https://docs.nephio.org/images/architecture/level2-nephio-container.png",
+    "ref_name": "nephio_level2_arch_image"
+  },
+  {
+    "name": "ETSI TS 128 530 V17.2.0",
+    "url": "https://www.etsi.org/deliver/etsi_ts/128500_128599/128530/17.02.00_60/ts_128530v170200p.pdf",
+    "ref_name": "3gpp_ts28530"
+  },
+  {
+    "name": "free5GC",
+    "url": "https://github.com/free5gc/free5gc",
+    "ref_name": "free5GC"
+  },
+  {
+    "name": "ocudu",
+    "url": "https://ocudu.org/",
+    "ref_name": "ocudu"
+  },
+  {
+    "name": "Nephio",
+    "url": "https://nephio.org/",
+    "ref_name": "Nephio"
+  },
+  {
+    "name": "E. Chirivella-Perez, P. Salva-Garcia, I. Sanchez-Navarro, J. M. Alcaraz-Calero, and Q. Wang, E2E network slice management framework for 5G multi-tenant networks, Journal of Communications and Networks, vol. 25, no. 3, pp. 392–404, June 2023, doi: 10.23919/JCN.2023.000019.",
+    "url": "https://ieeexplore.ieee.org/document/10146576",
+    "ref_name": "chirivella2023e2e"
+  },
+  {
+    "name": "B. Martini, M. Gharbaoui, and P. Castoldi, Intent-based network slicing for SDN vertical services with assurance: Context, design and preliminary experiments, Future Generation Computer Systems, vol. 142, pp. 101–116, May 2023, doi: 10.1016/j.future.2022.12.033.",
+    "url": "https://www.sciencedirect.com/science/article/pii/S0167739X2200437X",
+    "ref_name": "martini2023intent"
+  },
+  {
+    "name": "N.-B.-L. Tran, T. V. Ngo, M. V. Ngo, B. Chen, J. Park, and T. Q. S. Quek, INA-Infra: An Open and Extensible Infrastructure for Intent-driven Network Automation Research, Oct. 13, 2024, arXiv: arXiv:2410.09765. doi: 10.48550/arXiv.2410.09765.",
+    "url": "https://arxiv.org/abs/2410.09765",
+    "ref_name": "tran2024ina"
+  },
+  {
+    "name": "K. Antonakoglou, I. Mavromatis, S. Ghosh, M. Rouse, and K. Katsaros, CAMINO: Cloud-native Autonomous Management and Intent-based Orchestrator, Apr. 04, 2025, arXiv: arXiv:2504.03586. doi: 10.48550/arXiv.2504.03586.",
+    "url": "https://arxiv.org/abs/2504.03586",
+    "ref_name": "antonakoglou2025camino"
+  },
+  {
+    "name": "S. Ghosh, I. Mavromatis, K. Antonakoglou, and K. Katsaros, Performance Evaluation of Intent-Based Networking Scenarios: A GitOps and Nephio Approach, Sep. 18, 2025, arXiv: arXiv:2509.13901. doi: 10.48550/arXiv.2509.13901.",
+    "url": "https://arxiv.org/abs/2509.13901",
+    "ref_name": "ghosh2025performance"
+  },
+  {
+    "name": "C. Nahum et al., Intent-based Radio Scheduler for RAN Slicing: Learning to deal with different network scenarios, Jan. 01, 2025, arXiv: arXiv:2501.00950. doi: 10.48550/arXiv.2501.00950.",
+    "url": "https://arxiv.org/abs/2501.00950",
+    "ref_name": "nahum2025intent"
+  }
+]
