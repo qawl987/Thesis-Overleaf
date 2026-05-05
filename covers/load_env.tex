@@ -65,10 +65,27 @@ Style2*=\tiny$\blacksquare$ ,Style3*=$\circ$ ,Style4*=-- )
 \counterwithout{figure}{chapter}
 \counterwithout{table}{chapter}
 
-\usepackage{color}
+\usepackage{xcolor}
 
 % source code hightlighting
 \usepackage{listings}
+
+% Define YAML language for listings
+\lstdefinelanguage{yaml}{
+  keywords={true,false,null,yes,no,on,off},
+  keywordstyle=\color{blue}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=false,
+  comment=[l]{\#},
+  commentstyle=\color{gray!60},
+  stringstyle=\color{red},
+  morestring=[b]",
+  morestring=[b]',
+  literate=
+    *{:}{{{\color{red}{:}}}}{1}
+     {-}{{{\color{red}{-}}}}{1}
+}
+
 \lstset{
 	numbers=left,
 	stepnumber=1,
