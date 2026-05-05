@@ -1,44 +1,22 @@
 \chapter{System Model}
-\label{ch:architecture}
 
-如果想在latex裡面插入表格, 可以搜尋latex table generator, 有很多線上網站可以參考. 我個人都是使用線上網站去產生大致的語法, 然後再根據個人喜好去做微調, wikibook有很多資料可以參考, 網址在這邊: https://en.wikibooks.org/wiki/LaTeX/Tables
+\section{系統分層設計}
 
-如果要引用表格, 記得在table裡加上label的語法, 然後就可以呼叫 Tab~\ref{tab1}, 寫中文的就是表~\ref{tab1}. 通常Table的caption是寫在表格的上面, 圖片則是放在下面.
+本研究設計並實作一套意圖驅動切片編排系統（Intent-Driven Slicing Orchestration System），旨在透過宣告式介面簡化網路切片之管理門檻。如圖 \ref{fig:system_arch} 所示，本系統在視覺架構上劃分為三個主要平面，並依據職能細分為四個管理層級，以符合 3GPP 服務化管理架構（SBMA）之解耦原則。
 
-\begin{table}[!ht]
+\begin{figure}[H]
     \centering
-    \caption{This is a table.}
-    \label{tab1}
-    \begin{tabular}{|l|l|l|l|}
-    \hline
-        A & 1 & 4 & 7 \\ \hline
-        B & 2 & 5 & 8 \\ \hline
-        C & 3 & 6 & 9 \\ \hline
-    \end{tabular}
-\end{table}
-
-後來在圖書館的``2022 研究攻略營 論文寫作實戰技巧(顏安孜老師)''看到另一種作法，網址: http://bit.ly/3yE06Hx
-
-裡面的講義有提到Excel2LaTeX，細節可以去看圖書館的連結，裡面有放講義，下方是顏安孜老師的講義截圖。(不過我個人偏好直接使用latex的表格語法, 這種轉檔的東西有時候會怪怪的)
-
-\begin{figure}[htb]
-	\centering
-	\includegraphics[width=0.8\textwidth]{img/excel2latex.png}
-	\caption{Excel2LaTeX.}
-	\label{fig:excel2latex}
+    \includegraphics[width=0.95\linewidth]{img/3.1.1-arch.png}
+    \caption{本系統之意圖驅動跨網域切片編排架構圖}
+    \label{fig:system_arch}
 \end{figure}
 
+\begin{enumerate}
+    \item \textbf{服務消費者層（Service Consumer Layer）}：對應架構圖中 Layer 1 之 Service Consumer Domain。此層級為管理需求之發起者，扮演 \textbf{MnS Consumer} 之角色。消費者透過 \textbf{Kubernetes API Server} 提供的 \textbf{Intent Management MnS Interface}，下發宣告式之 \texttt{E2EQoSIntent} 自定義資源。使用者僅需根據業務需求定義高階期望指標，例如頻寬期望（\texttt{bandwidth: "high"}）、延遲期望（\texttt{latency: "ultra-low"}）或資源共享策略（\texttt{resourceShare: "Full"}），無需介入底層網域之特定技術配置。
 
-\begin{table} [h]
-\centering
-\caption{Comparison on model efficiency and model size.}
-\begin{tabular}{c|c|c}
-\toprule[1.25pt]
-Model   & {Training \& Test }  & {Model Size }      \\ 
-\midrule
-LTD-GCN   & \textbf{11ms}    \& \textbf{4.5ms}       & 2.50M             \& 2.50M     \\ 
-LTD-GCN-i & \underline{13ms} \& \underline{4.6ms}    & 2.75M             \& 2.76M     \\  
-\bottomrule[1.25pt]
-\end{tabular}
-\label{table:model_com}
-\end{table}
+    \item \textbf{意圖編排與協調層（Intent Orchestration Layer）}：對應架構圖 Layer 2 之核心組件。本層級由 \textbf{E2E Orchestrator} 構成，實質承擔 \textbf{NSMF / Intent Handler} 之職能。其負責監聽北向介面之意圖請求，並執行意圖轉譯（Intent Translation），將抽象 SLA 期望精確映射為網域特定參數（如 Core 網域之 5QI 與 RAN 網域之 PRB 比例）。
+
+    \item \textbf{供應與南向介面層（Southbound Interface Layer）}：同樣位於 Layer 2 之管理叢集（Management Cluster）內，負責執行跨網域之編排指令下發。針對 RAN 網域，本系統整合 \textbf{Nephio Porch} 與 \textbf{Kpt Pipeline}，透過 \textbf{Git Repo} 實施配置套件之變更與發布；針對 Core 網域，則透過封裝之 \textbf{REST Client} 執行混合式編排，直接與核心網管理介面進行通訊。
+
+    \item \textbf{網域執行與實施層（Domain Execution Layer）}：對應架構圖 Layer 3 之 NSSMF Domain。此層級負責將編排結果落實於實體網路環境，包含負責無線存取網網域調和之 \textbf{srsran-operator} 與負責核心網網域調和之 \textbf{free5gc-operator}。各 Operator 透過 \textbf{ConfigSync} 監聽期望狀態，並驅動實體網元（如 srsRAN 之 CU/DU 與 free5GC 之各個 NF）執行資源隔離與 QoS 配置。
+\end{enumerate}
