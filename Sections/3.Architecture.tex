@@ -7,7 +7,7 @@
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.95\linewidth]{img/3.1.1-arch.png}
+    \includegraphics[width=1.0\linewidth]{img/3.1.1-arch.png}
     \caption{本系統之意圖驅動跨網域切片編排架構圖}
     \label{fig:system_arch}
 \end{figure}
@@ -181,7 +181,7 @@ data:
 透過上述基於 Nephio Porch 的工作流實作，本系統在 RAN 網域的編排上達成了兩項關鍵的雲原生工程特性：
 \begin{itemize}
     \item \textbf{具備可追溯性之版本控制 (Version Control)}：所有針對 RAN 切片參數的修改，皆被封裝為不可變的修訂版本（PackageRevision）。這使得網路配置具備了類似軟體程式碼的「單一事實來源（Single Source of Truth, SSOT）」，當意圖發生衝突或配置失效時，系統具備退回（Rollback）至前一穩定版本的基礎能力。
-    \item \textbf{確保狀態一致性之原子性變更 (Atomic Mutation)}：在傳統 REST API 連續呼叫的模式下，若中途發生網路異常，極易導致配置僅部分生效的「髒狀態（Dirty State）」。本系統透過 KRM 套件封裝，將 \texttt{SrsRANCellConfig}（PRB 資源劃分）與 \texttt{PLMNConfig}（網路識別廣播）等具備高度相依性的資源打包。當 ConfigSync 進行同步時，這些配置會被視為一個完整的邏輯單元進行套用，確保了變更的「原子性」——意即配置要麼全部生效，要麼全部不生效，從根本上消除了分散式系統中部分配置失敗的隱患。
+    \item \textbf{確保狀態一致性之原子性變更 (Atomic Mutation)}：在傳統 REST API 連續呼叫的模式下，若中途發生網路異常，極易導致配置僅部分生效的「髒狀態（Dirty State）」。本系統透過 KRM 套件封裝，將 \texttt{SrsRANCellConfig}（PRB 資源劃分）與 \texttt{PLMNConfig}（網路識別廣播）等具備高度相依性的資源打包。當 ConfigSync 進行同步時，這些配置會被視為一個完整的邏輯單元進行套用，確保了變更的「原子性」，從根本上消除了分散式系統中部分配置失敗的隱患。
 \end{itemize}
 
 \subsection{核心網子網域編排路徑：基於 REST API 之混合式異質整合機制}
@@ -197,10 +197,10 @@ data:
 \subsubsection{混合式編排架構之實施}
 為了克服上述限制，本系統採用「混合式編排」架構，其核心設計邏輯在於：在維持編排器北向介面（Intent Management MnS Interface）宣告式特性的同時，透過封裝 \textit{REST Client} 確保對異質網域之相容性。
 
-具體實作上，\textit{E2E Orchestrator} 內建了 \texttt{Free5GCClient} 模組，將轉譯後的 5QI、S-NSSAI 與目標 IMSI 封裝為核心網可理解之 REST 指令：
+具體實作上，\textit{E2E Orchestrator} 內建了 \texttt{free5GCClient} 模組，將轉譯後的 5QI、S-NSSAI 與目標 IMSI 封裝為核心網可理解之 REST 指令：
 \begin{enumerate}
-    \item \textbf{動態用戶註冊}：針對 \texttt{E2EQoSIntent} 中定義的每一組 \texttt{targetUEs}，編排器透過 \texttt{RegisterSubscriber()} 介面自動於核心網建立對應用戶。
-    \item \textbf{QoS 參數注入}：若用戶已存在，編排器則調用 \texttt{UpdateSubscriberQoS()}，將意圖轉譯所得之 5QI、SST 與 SD 參數注入該用戶的會話管理訂閱資料（Session Management Subscription Data）中。
+    \item \textbf{動態用戶註冊}：針對 \texttt{E2EQoSIntent} 中定義的每一組 \texttt{targetUEs}，編排器自動於核心網建立對應用戶。
+    \item \textbf{QoS 參數注入}：若用戶已存在，編排器則將意圖轉譯所得之 5QI、SST 與 SD 參數注入該用戶的會話管理訂閱資料（Session Management Subscription Data）中。
 \end{enumerate}
 
 \subsection{意圖達成狀態監控：基於 CRD Status 之狀態回饋迴圈}
@@ -282,41 +282,22 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
     \item \textbf{本地實體化 (Local Execution)}：一旦 \texttt{NFDeployment} 資源出現在工作負載叢集內，\texttt{srsran-operator} 隨即捕捉到此訊號，並執行前述之遞迴查找，最終生成 CU-CP、CU-UP 與 DU 的 \texttt{Deployment} 與 \texttt{ConfigMap}，完成從雲端編排到邊緣實施的自動化閉環。
 \end{itemize}
 
-透過此機制，本系統不僅達成了切片部署的自動化，更確保了在多叢集電信雲環境下，配置的一致性與可追溯性。
-
 \subsection{階層化配置模型與自定義資源 (Hierarchical Config CRDs)}
 \label{subsec:hierarchical_config_model}
 
-為了在雲原生環境中實現電信級網元的靈活配置，本研究針對 \textit{srsRAN} 網元的特性，設計了一套階層化的配置模型。此模型將原本雜亂的單一組態檔解構為三個維度的自定義資源（Custom Resources），分別對應電信網路中不同層級的參數需求，從而支持編排器執行精準的「套件專化（Package Specialization）」。
+為了在雲原生環境中實現電信級網元的靈活配置，本研究針對 \textit{srsRAN} 的特性，設計了一套階層化的配置模型。此模型將傳統架構中單一且複雜的組態檔案解構為三個維度的自定義資源（Custom Resources），分別對應應用層、物理調度層與網路識別層之需求，進而達成配置的模組化管理。
 
 \subsubsection{SrsRANConfig：應用與模擬環境層 (Application Layer)}
-\texttt{SrsRANConfig} 資源主要定義與容器運行環境及模擬基礎設施相關的參數。其核心功能在於解耦網元邏輯與底層部署環境：
-\begin{itemize}
-    \item \textbf{容器鏡像管理}：定義 CU-CP、CU-UP 與 DU 各組件所使用的容器鏡像版本。
-    \item \textbf{ZMQ 虛擬射頻配置}：定義是否啟用 ZMQ 模擬模式，並設定採樣率（\texttt{srate}）、發射增益（\texttt{txGain}）與接收增益（\texttt{rxGain}），確保 SDR 模擬環境的穩定性。
-    \item \textbf{核心網對接資訊}：定義目標 AMF 的存取位址，作為 CU-CP 建立 N2 連結的基礎。
-\end{itemize}
+\texttt{SrsRANConfig} 資源主要負責定義容器運行環境及模擬基礎設施相關參數，其核心功能在於解耦網元邏輯與底層部署環境。在網元生命週期管理中，該資源不僅指定了 CU-CP、CU-UP 與 DU 各組件所使用的容器鏡像版本，亦涵蓋了 ZMQ 虛擬射頻環境的關鍵配置，例如採樣率（\texttt{srate}）、發射增益（\texttt{txGain}）與接收增益（\texttt{rxGain}）等。
 
 \subsubsection{SrsRANCellConfig：物理與資源調度層 (Physical \& Scheduling Layer)}
-此資源是落實存取網切片意圖的核心關鍵，主要定義 Distributed Unit (DU) 的實體單元參數以及 \textbf{RAN Slicing Scheduler Policy}：
-\begin{itemize}
-    \item \textbf{無線單元參數}：包含下行絕對頻點識別碼（\texttt{dlArfcn}）、運作頻段（\texttt{band}）、通道頻寬與子載波間隔（\texttt{commonScs}）等物理層配置。
-    \item \textbf{切片排程策略}：此欄位直接承載來自 \textit{E2E Orchestrator} 轉譯後的意圖參數。透過 \texttt{spec.slicing} 陣列，為每個 S-NSSAI 定義專屬的 \texttt{minPrbPolicyRatio}、\texttt{maxPrbPolicyRatio} 與排程優先級（\texttt{Priority}），實現無線資源的硬性隔離與差別化服務。
-\end{itemize}
+此資源是落實存取網切片意圖的核心關鍵，詳細定義了分散單元（DU）的實體參數以及無線資源排程策略。在物理層配置方面，其包含了下行絕對頻點識別碼（\texttt{dlArfcn}）、運作頻段（\texttt{band}）、通道頻寬與子載波間隔（\texttt{commonScs}）等參數。更重要的是，該資源承載了來自端到端編排器轉譯後的意圖參數，透過定義各組 S-NSSAI 專屬之最小與最大實體資源區塊比例（PRB Ratio）以及調度優先級（\texttt{Priority}），在底層排程器中實現無線資源的硬性隔離與差別化服務品質。
 
 \subsubsection{PLMNConfig：網路識別層 (Network Identity Layer)}
-\texttt{PLMNConfig} 資源定義了行動網路的識別邏輯，確保用戶設備（UE）能正確識別並接取目標切片。其配置內容主要影響 CU-CP 廣播的系統資訊：
-\begin{itemize}
-    \item \textbf{網路標識}：定義公共陸地行動網路標識（PLMN ID）與追蹤區碼（Tracking Area Code, TAC）。
-    \item \textbf{切片支援列表}：定義該追蹤區內支援的切片清單（S-NSSAI List）。編排器會動態同步此處的 SST/SD 資訊，使其與 \texttt{SrsRANCellConfig} 中的排程器配置保持一致，避免因識別碼不匹配導致的 UE 接取失敗。
-\end{itemize}
-
-透過此階層化模型，\texttt{srsran-operator} 能夠將來自不同維度的宣告式狀態，最終聚合（Aggregate）並渲染為網元所需的實體組態檔，達成高度自動化的資源調和。
+\texttt{PLMNConfig} 資源定義了行動網路的識別邏輯，確保用戶設備（UE）能正確識別並接取目標切片。該模型維護了特定追蹤區內支援的切片清單（S-NSSAI List），並由編排器執行自動化同步，確保此處的 SST/SD 資訊與 \texttt{SrsRANCellConfig} 中的排程器配置嚴格一致。
 
 \subsection{電信雲化網路拓樸與邏輯介面管理 (Multus \& IPAM)}
 \label{subsec:multus_ipam_management}
-
-為了在虛擬化環境中精確模擬 5G 實體網元的連通行為，本研究定義了一套「確定性的邏輯網路拓樸（Deterministic Logical Topology）」。透過 \textit{Nephio IPAM} 與 \textit{Multus CNI} 的協作，系統得以自動將預定義的 IP 地址注入對應的虛擬介面中。這確保了在軟體定義無線電（SDR）模擬環境下，CU、DU 與 UE 之間的 ZMQ 通道能具備穩定的路由路徑。
 
 \subsubsection{多介面容器設計與邏輯隔離}
 在 3GPP 標準架構中，控制面（Control Plane）與用戶面（User Plane）的物理或邏輯隔離是確保電信網路安全與效能的關鍵。傳統 Kubernetes Pod 通常僅具備單一網路介面（\texttt{eth0}），難以模擬 5G 網元複雜的介面需求（如 N2 控制面與 N3 用戶面的分離）。
@@ -324,7 +305,7 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
 本系統透過 \textit{Multus CNI} 為 \textit{srsRAN} 組件實作了多介面容器設計。藉由 \textit{NetworkAttachmentDefinition} 資源，每個網元 Pod 能夠掛載多個專屬的次要介面（Secondary Interfaces），分別承載 N2、N3、E1 與 F1 等不同性質的流量，達成邏輯上的徹底隔離。
 
 \subsubsection{邏輯拓樸與 IP 分配策略}
-本系統的 IP 分配並非手動設定，而是由 \texttt{srsran-operator} 自動化完成。當 Operator 監聽並讀取 \texttt{NFDeployment} 中的介面請求（Interface Requests）後，會結合 \textit{Nephio IPAM} 所核發的子網段資訊，自動運算出各組件的固定偏置 IP（IP Offset），並將其注入至自動生成的 \texttt{ConfigMap} 內容中。表 \ref{tab:logical_interface_mapping} 詳細列出了 IDSOS 實驗環境之邏輯網路介面對應關係。
+本系統的 IP 分配並非手動設定，而是由 \texttt{srsran-operator} 自動化完成。當 Operator 監聽並讀取 \texttt{NFDeployment} 中的介面請求（Interface Requests）後，會結合 \textit{Nephio IPAM} 所核發的子網段資訊，自動運算出各組件的固定偏置 IP（IP Offset），並將其注入至自動生成的 \texttt{ConfigMap} 內容中。表 \ref{tab:logical_interface_mapping} 詳細列出了實驗環境之邏輯網路介面對應關係。
 
 \begin{table}[htbp]
     \centering
@@ -347,169 +328,33 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
     \end{tabular}
 \end{table}
 
-\subsubsection{SDR 模擬之射頻鏈路對映：GNU Radio Breaker}
-在無線資源隔離的驗證中，如何於虛擬化環境模擬多用戶（Multi-UE）的物理隔絕是另一大挑戰。由於 \textit{srsRAN} 在 ZMQ 模式下預設採用點對點連結，難以直接擴展至多用戶場景。本研究引入了 \textbf{GNU Radio Breaker} 組件，作為模擬環境中的「虛擬通道」。
-
-如表 \ref{tab:zmq_endpoint_mapping} 所示，所有的無線電訊號皆透過特定的 ZMQ Endpoint 進行對映。GNU Radio Breaker 負責攔截來自 DU 下行（Downlink）的訊號並分發至多個 UE，同時合併來自不同 UE 的上行（Uplink）訊號後轉發回 DU。此機制成功模擬了電磁波在空間中的傳播路徑，為後續驗證 PRB Ratio 資源隔離提供了穩定的物理層基礎。
-
-\begin{table}[htbp]
-    \centering
-    \caption{SDR 模擬之 ZMQ 射頻鏈路對映表}
-    \label{tab:zmq_endpoint_mapping}
-    \begin{tabular}{|l|l|}
-    \hline
-    \textbf{射頻鏈路路徑 (RF Link)} & \textbf{ZMQ Endpoint 位址} \\ \hline
-    DU Downlink Source & tcp://172.6.0.0:2000 \\ \hline
-    UE1 Uplink Source & tcp://172.6.0.3:2001 \\ \hline
-    UE2 Uplink Source & tcp://172.6.0.4:2002 \\ \hline
-    Breaker Endpoint (DU/UE RX) & tcp://172.6.0.1:2001 \\ \hline
-    Breaker Downlink to UE1 & tcp://172.6.0.1:2100 \\ \hline
-    Breaker Downlink to UE2 & tcp://172.6.0.1:2200 \\ \hline
-    \end{tabular}
-\end{table}
-
-\subsection{無線資源隔離與切片調度轉譯 (RAN Slicing Realization)}
-\label{subsec:ran_slicing_realization}
-
-在 \textit{E2E Orchestrator} 完成跨網域意圖轉譯後，\texttt{srsran-operator} 需將接收到的領域參數轉化為 \textit{srsRAN} 分散單元（DU）可執行的實施配置。
-
-\subsubsection{從宣告式狀態至實體組態之渲染}
-\texttt{srsran-operator} 內建了基於 Go Template 實作的組態渲染引擎。當調和工作流讀取到 \texttt{SrsRANCellConfig} 中的 \texttt{spec.slicing} 內容時，會將其轉換為 \textit{srsRAN} 專屬的 YAML 結構。
-
-\subsubsection{切片調度參數映射策略}
-為了驗證資源隔離的有效性，本研究針對異質切片需求預定義了一套參數映射策略。表 \ref{tab:slicing_params} 詳細列出了實驗環境中使用的具體數值。
-
-\begin{table}[htbp]
-    \centering
-    \caption{RAN 切片資源調度參數對映表}
-    \label{tab:slicing_params}
-    \begin{tabular}{|l|l|l|l|l|}
-    \hline
-    \textbf{切片類型} & \textbf{S-NSSAI (十進位)} & \textbf{Min PRB \%} & \textbf{Max PRB \%} & \textbf{排程優先級} \\ \hline
-    URLLC (Full) & SST: 1, SD: 1122867 & 0\% & 100\% & 200 (最高) \\ \hline
-    eMBB (Partial) & SST: 1, SD: 66051 & 0\% & 50\% & 10 (一般) \\ \hline
-    \end{tabular}
-\end{table}
-
-在此映射策略下：
-\begin{itemize}
-    \item \textbf{資源天花板保障}：透過 \texttt{max\_prb\_policy\_ratio} 的限制，系統能確保非關鍵切片（如 eMBB）在資源面臨極端負載時，不會排擠到關鍵切片的運作空間。
-    \item \textbf{調度優先權保障}：透過賦予 URLLC 高達 200 的排程優先級，\textit{srsRAN} 的 MAC 層排程器會在每個時槽（Slot）優先處理該切片的緩存數據，從而縮短排隊延遲（Queuing Delay），落實意圖中對「超低延遲」的保障。
-\end{itemize}
-
 \subsection{資源狀態追蹤與自癒回饋機制 (Status Reporting \& Self-healing)}
 \label{subsec:ran_status_reporting}
 
-為了與上層 \textit{E2E Orchestrator} 達成閉環連動，\texttt{srsran-operator} 實作了細粒度的資源狀態回報與異常處理機制。不同於編排器關注的業務意圖達成率，本節著重於 Operator 如何管理底層實體資源的生命週期完整性。
+為了與上層 \textit{E2E Orchestrator} 達成閉環連動，\texttt{srsran-operator} 著重於管理底層實體資源的生命週期完整性，並透過 Kubernetes 的狀態機制實作即時監測與回饋。在調和工作流中，Operator 會動態更新 \texttt{NFDeployment} 資源的 \texttt{status.conditions} 欄位，將工作負載叢集內的實體佈署進度同步回饋至 \textit{Nephio} 管理層。當 Operator 成功解析所有依賴之配置資源，並渲染出 \textit{srsRAN} 所需之 \texttt{Deployment} 與 \texttt{ConfigMap} 時，系統會將 \texttt{resourceCreation} 指標標註為 \texttt{True}，隨後將整體狀態設為 \texttt{Ready}。此機制確保了系統狀態的透明度，使得上層編排器能精確判別存取網域的參數是否已從抽象的「宣告狀態」有效轉化為實體的「執行狀態」；若底層資源發生異常（如 Pod 啟動失敗），Operator 亦會即時更新狀態訊息，觸發全域的狀態回饋迴圈。
 
-\subsubsection{基於 NFDeployment Conditions 的閉環監測}
-\texttt{srsran-operator} 透過動態更新 \texttt{NFDeployment} 資源的 \texttt{status.conditions} 欄位，將工作負載叢集內的實體佈署狀態回饋至 Nephio 管理層。
-當 Operator 成功解析所有依賴之 CR 資源並渲染出 \textit{srsRAN} 所需之 \texttt{Deployment} 與 \texttt{ConfigMap} 時，系統會將 \texttt{resourceCreation} 指標標註為 \texttt{True}，並隨後將整體狀態設為 \texttt{Ready}。
-
-此機制確保了狀態的透明度，使得上層編排器能精確判別存取網域的參數是否已從「宣告狀態」轉化為「執行狀態」。若底層資源發生異常（如 Pod 啟動失敗），Operator 會即時更新狀態訊息，觸發整體的狀態回饋迴圈。
-
-\subsubsection{錯誤處理：配置缺失之回饋機制}
-在調和流程中，最常見的異常為依賴資源的缺失。本系統實作了 \texttt{invalidConfigInfo} 檢測邏輯：
-當 Operator 執行引用遞迴查找時，若發現 \texttt{SrsRANConfig}、\texttt{SrsRANCellConfig} 或 \texttt{PLMNConfig} 其中任一項資源尚未就緒，Reconciler 會在 \texttt{NFDeployment.status.conditions} 中注入類型為 \texttt{invalidConfigInfo} 的失敗訊息，進入重試迴圈，直到所有依賴資源皆齊備為止
-
-\subsubsection{資源清理之原子性保障：Finalizer 機制}
-為確保網路功能的生命週期管理符合「原子性（Atomicity）」，本研究在 Operator 中實作了 \texttt{Finalizer} 刪除鎖定機制。
-傳統的 Kubernetes 刪除操作若未妥善處理，可能會導致 \texttt{NFDeployment} 資源已刪除，但其派生出的 CU/DU \texttt{Deployment} 仍殘留在叢集中的「資源遺留（Resource Leak）」現象。
-
-當用戶或編排器發起刪除請求時，\texttt{srsran-operator} 會攔截該事件並執行清理邏輯，確保與該 \texttt{NFDeployment} 關聯的所有 \texttt{ConfigMap}、\texttt{ServiceAccount} 與 \texttt{Deployment} 皆被同步銷毀。唯有在確認所有底層資源皆已安全釋放後，Operator 才會移除 \texttt{Finalizer} 並允許該網元實例從叢集中徹底消失，從而保障了網路切片資源清理的完整性。
+此外，針對調和流程中最常見的配置缺失異常，本系統實作了 \texttt{invalidConfigInfo} 檢測邏輯以強化自癒能力。當 Operator 執行引用遞迴查找時，若偵測到 \texttt{SrsRANConfig}、\texttt{SrsRANCellConfig} 或 \texttt{PLMNConfig} 其中任一項依賴資源尚未就緒，\textit{Reconciler} 會立即在 \texttt{NFDeployment.status.conditions} 中注入類型為 \texttt{invalidConfigInfo} 的失敗訊息，詳列缺失項目並自動進入重試迴圈。透過這種基於狀態條件的監控與自動重試機制，系統得以在複雜的分散式環境下，持續嘗試排除配置不完整的狀態，直至所有依賴資源齊備並達成最終一致性，體現了雲原生編排架構下的自癒特性。
 
 \section{核心網網域之自動化編排與特殊化實作}
 \label{sec:core_domain_orchestration}
 
-本章節論述本系統如何針對核心網網域實作自動化編排。不同於存取網端的高度自定義實作，核心網網域側重於利用 \textit{Nephio} 標準架構進行異質網元的配置專化（Specialization），並透過自動化管道克服現有開源藍圖的實施挑戰。
+在本系統中，核心網端的資源調和由 \texttt{free5gc-operator} 負責。該組件採用 \textit{Nephio} 官方發佈版本，其核心運作邏輯同樣基於 Kubernetes Operator 模式。由於 \texttt{free5gc-operator} 在監聽 \texttt{NFDeployment} 資源、執行調和（Reconcile）迴圈以及透過 KRM 狀態機維護資源最終一致性等方面，與前述 \ref{sec:ran_nssmf_implementation} 節所論述之 \texttt{srsran-operator} 具備高度架構相似性，故本節將重點轉向雲原生基礎設施自動化實作，透過自動化腳本確保工作負載叢集（Workload Cluster）節點具備承載 5G 邏輯介面的物理基礎，並向管理平台宣告精確的網路視圖。具體實作包含以下兩個核心維度：
 
-\subsection{核心網網域編排器概覽與特殊化策略}
-\label{subsec:core_orchestrator_overview}
-
-\subsubsection{組件定位與架構相似性}
-在本系統中，核心網端的資源調和由 \texttt{free5gc-operator} 負責。該組件採用 \textit{Nephio} 官方發佈版本，其核心運作邏輯同樣基於 Kubernetes Operator 模式。由於 \texttt{free5gc-operator} 在監聽 \texttt{NFDeployment} 資源、執行調和（Reconcile）迴圈以及透過 KRM 狀態機維護資源最終一致性等方面，與前述 \ref{sec:ran_nssmf_implementation} 節所論述之 \texttt{srsran-operator} 具備高度架構相似性，故本節不再重複贅述其基礎組件之底層運作原理，而將重點轉向其上層編排策略。
-
-\subsubsection{實作挑戰與藍圖瑕疵說明}
-在實作過程中發現，現有的 \textit{Nephio} 官方核心網範本（Blueprints）在特定實驗環境下存在配置瑕疵。這些挑戰主要包含：
 \begin{itemize}
-    \item \textbf{IP 地址衝突}：官方藍圖在處理跨叢集 IPAM 分配時，若缺乏精確的特殊化干預，容易產生介面位址重疊之隱患。
-    \item \textbf{資源池數量不足}：預設配置通常僅針對單一網路切片進行定義，無法滿足本研究中 eMBB 與 URLLC 等多維度多切片（Multi-slice）共存的資源池隔離需求。
+    \item \textbf{基礎設施即代碼 (IaC)：虛擬介面與 VLAN 隔離實作}：本研究透過自動化指令集在 Workload Cluster 的 Worker 節點中建立必要的網路底層，包含利用 Linux \texttt{dummy} 技術建立名為 \texttt{eth1} 的虛擬主幹介面，並在其上劃分 VLAN 2 至 6 的子介面（如 \texttt{eth1.3} 承載 N2/N3 流量，\texttt{eth1.4} 承載 N4 流量）。這種封裝技術在單一物理網卡上實作了邏輯上的完全隔離，符合 3GPP 對於不同參考點安全性與效能隔離的要求。
+    \item \textbf{宣告式網路拓樸定義 (RawTopology)}：為了讓 \textit{Nephio} 管理叢集能識別並管理工作負載叢集的網路資源，本系統下發了名為 \texttt{RawTopology} 的宣告式資源，定義叢集節點的物理屬性與標籤。這不僅建立了管理平面與受控叢集間的物理連通視圖，更為 \textit{Nephio IPAM} 的自動化分配提供了邏輯基礎，使系統能根據標籤自動在對應的 \texttt{NetworkInstance} 中劃分出專屬的 IP 地址池與路由條目，確保核心網網元能獲得具備唯一性且可路由的電信級 IP 地址。
 \end{itemize}
-因此，本系統必須在編排流程中引入額外的介入機制，以修正並強化藍圖的健全性。
-
-\subsubsection{自動化編排管道 (Domain Orchestration Pipeline)}
-為了達成核心網網元的自動化部署並確保其能與 \textit{NSMF}（即 \textit{E2E Orchestrator}）有效對接，本研究設計了一套自動化編排管道。此管道透過自動化腳本實作了 \textit{NSSMF} 層級的「特殊化（Specialization）」流程：
-\begin{enumerate}
-    \item \textbf{配置注入}：將轉譯後的特定切片參數動態注入套件中。
-    \item \textbf{依賴協同}：自動協調 SMF 與 UPF 間的端點依賴關係。
-    \item \textbf{狀態觸發}：驅動 \textit{Porch} 的生命週期管理，使配置變更生效。
-\end{enumerate}
-本節後續將詳細展開此管道在基礎設施配置與切片感知特殊化方面的具體實作。
-
-\subsection{雲原生基礎設施自動化：電信拓樸與虛擬介面配置}
-\label{subsec:infra_automation}
-
-核心網網元的自動化編排不僅限於應用層的佈署，更包含對底層網路環境的預先整備。本系統透過自動化腳本確保工作負載叢集（Workload Cluster）之節點具備承載 5G 邏輯介面的物理基礎，並向管理平台宣告精確的網路視圖。
-
-\subsubsection{基礎設施即代碼 (IaC)：虛擬介面與 VLAN 隔離實作}
-本研究採用基礎設施即代碼（Infrastructure as Code, IaC）之原則，透過自動化指令集在 Workload Cluster 的 Worker 節點中建立必要的網路底層。具體實作包含：
-\begin{itemize}
-    \item \textbf{eth1 虛擬介面建立}：利用 Linux \texttt{dummy} 介面技術建立名為 \texttt{eth1} 的虛擬主幹介面，作為電信流量的數據平面（Data Plane）入口。
-    \item \textbf{多維度 VLAN 劃分}：在 \texttt{eth1} 之上建立 VLAN 2 至 6 的子介面（如 \texttt{eth1.3} 承載 N2/N3 流量，\texttt{eth1.4} 承載 N4 流量）。這種封裝技術在單一物理網卡上實作了邏輯上的完全隔離，符合 3GPP 對於不同參考點（Reference Points）安全性與效能隔離的要求。
-\end{itemize}
-
-\subsubsection{宣告式網路拓樸定義 (RawTopology)}
-為了讓 \textit{Nephio} 管理叢集能識別並管理工作負載叢集的網路資源，本系統下發了名為 \texttt{RawTopology} 的宣告式資源。該資源定義了叢集節點的物理屬性與標籤（Labels），其學術與實務價值在於：
-\begin{itemize}
-    \item \textbf{建立物理連通視圖}：透過 \texttt{RawTopology}，管理平面得以獲知工作負載叢集的節點名稱與其所屬的提供者資訊，建立起管理叢集與受控叢集間的邏輯映射。
-    \item \textbf{IP 分配與路由之邏輯基礎}：此定義為後續 \textit{Nephio IPAM} 的自動化分配提供了上下文。系統能根據拓樸定義中的叢集名稱標籤（\texttt{nephio.org/cluster-name}），自動在對應的 \texttt{NetworkInstance} 中劃分出專屬的 IP 地址池與路由條目，確保核心網網元在啟動時能獲得具備唯一性且可路由的電信級 IP 地址。
-\end{itemize}
-
-透過此自動化整備流程，系統消除了手動配置網路介面的繁瑣與出錯風險，為後續網元套件的特殊化流程奠定了堅實的基礎。
-
-\subsection{切片感知之 Package 特殊化與多維度資源池配置}
-\label{subsec:slice_aware_specialization}
-
-核心網編排的挑戰在於如何將通用的網元藍圖轉換為支援多切片架構的實體配置。本系統透過自動化特殊化程序，針對 UPF 的資源池與 SMF 的關聯配置進行動態調整。
-
-\subsubsection{套件變更 (Mutate) 機制：多維度資源池擴展}
-在預設的核心網藍圖中，用戶面網元（UPF）通常僅配置單一的網路位址池，難以實作異質業務間的流量隔離。本系統的自動化管道在 \textit{NSSMF} 層級實作了套件變更機制：
-\begin{itemize}
-    \item \textbf{動態修改 UPF \texttt{NFDeployment}}：管道透過 \textit{Porch} 提取 UPF 套件草稿，並針對 \texttt{upfdeployment.yaml} 進行注入。
-    \item \textbf{資源池三重化}：將預設的單一 \texttt{vpc-internet} 資源池擴展為三組獨立的子網段（如 10.0.1.0/24、10.0.2.0/24 與 10.0.3.0/24），分別對應 eMBB、URLLC 與 MIoT 三種不同切片類型。這種配置確保了不同業務類型的用戶設備（UE）在核心網端具備獨立的 IP 路由路徑，從源頭落實數據平面的切片隔離。
-\end{itemize}
-
-\subsubsection{跨組件依賴協同：SMF 與 UPF 之配置對映}
-核心網控制面（SMF）必須精確掌握用戶面（UPF）的端點資訊才能正確執行會話管理。為了達成網域內部的服務鏈結（Service Chaining），本系統實作了跨組件的依賴調和：
-\begin{itemize}
-    \item \textbf{宣告式引用 (Step 7)}：系統建立了一個 \texttt{ref.nephio.org} 規範的 \texttt{Config} 資源，作為 SMF 與 UPF 間的資訊橋樑。
-    \item \textbf{端點自動對映}：該 \texttt{Config} 資源會精確引用 UPF 生成的 N3（RAN 介面）、N4（控制面介面）與 N6（外部數據介面）之端點位址。透過此機制，SMF 的 Operator 能自動獲取 UPF 的實體配置，確保會話建立請求能準確導向對應切片的資源池，達成網域內部組件間的無縫協同。
-\end{itemize}
-
-透過此特殊化與依賴協同機制，本系統成功將原本靜態的核心網藍圖，轉化為具備切片感知能力的動態服務架構。
 
 \section{實驗驗證環境與多用戶模擬架構}
 \subsection{驗證環境之編排策略與職能分工}
 \label{subsec:validation_strategy}
 
-為了驗證意圖驅動編排系統在真實電信場景下的有效性，本研究構建了一個模擬實驗平台。在編排策略上，本系統採取了「基礎設施與測試資源分離」的設計原則，將受測系統（System Under Test, SUT）與模擬器（Emulator）在編排層級進行邏輯解耦。
+為了驗證意圖驅動編排系統在真實電信場景下的有效性，本研究構建了一個模擬實驗平台。在編排策略上，本系統採取了「基礎設施與測試資源分離」的設計原則，將受測系統（System Under Test, SUT）與模擬器（Emulator）在編排層級進行邏輯解耦。在本實驗環境中，網路元件依其職能被劃分為以下兩個不同的編排管道，以達成測試靈活性與環境真實性的平衡：
 
-\subsubsection{基礎設施與測試資源的編排差異}
-在本實驗環境中，網路元件依其職能被劃分為兩個不同的編排管道：
 \begin{itemize}
-    \item \textbf{Nephio 自動化管道 (受測系統)}：核心網元件（free5GC）與存取網組件（srsRAN CU/DU）被視為電信基礎設施的一部分。這些組件被納入基於 \textit{Nephio} 的 \textit{workload pipeline} 中，接受 \textit{E2E Orchestrator} 的宣告式意圖管理。這模擬了電信營運商在生產環境中對網路功能（NFs）的自動化編排與生命週期管理。
-    \item \textbf{Helm 部署層 (測試與模擬資源)}：用戶設備（srsUE）、\textit{GNU Radio Breaker}（射頻橋接器）以及 \textit{iperf3} 流量產生工具，則被歸類為測試端資源。本研究利用 \texttt{srsran-helm} 專案，透過手動或腳本化的 \textit{Helm} 方式進行部署。UE 等元件無需納入複雜的 \textit{Nephio} 宣告式管線，而是以更為直接、靈活的方式建立。
+    \item \textbf{Nephio 自動化管道 (受測系統)}：核心網元件（free5GC）與存取網組件（srsRAN CU/DU）被視為電信基礎設施的一部分。這些組件被納入基於 \textit{Nephio} 的 \textit{workload pipeline} 中，接受 \textit{E2E Orchestrator} 的宣告式意圖管理。此設計模擬了電信營運商在生產環境中，如何透過自動化管道對網路功能（NFs）執行完整的生命週期管理與切片參數配置。
+    \item \textbf{Helm 部署層 (測試與模擬資源)}：用戶設備（srsUE）、\textit{GNU Radio Breaker}（射頻橋接器）以及 \textit{iperf3} 流量產生工具，則被歸類為測試端資源。本研究利用 \texttt{srsran-helm} 專案，透過 \textit{Helm} 方式進行獨立部署。由於 UE 等元件主要用於模擬業務行為，無需納入複雜的 \textit{Nephio} 宣告式管線，採用 \textit{Helm} 能提供更直接且靈活的配置變更能力。
 \end{itemize}
-
-\subsubsection{邏輯解耦與 SUT/Emulator 分離原則}
-此種職能分工的核心價值在於實現了「模擬器（Emulator）」與「受測系統（SUT）」的邏輯解耦，符合電信一致性測試之標準原則。具體優勢如下：
-\begin{enumerate}
-    \item \textbf{動態擴展能力}：測試人員可以在不變動、不重啟底層核心網與存取網基礎設施的前提下，透過 \textit{Helm} 快速增減測試用戶（UE）的數量或調整 \textit{GNU Radio} 的通道模型。這種設計允許系統在穩定的實體網路拓樸上，執行多樣化的邊界條件測試。
-    \item \textbf{環境真實性模擬}：將 CU/DU 置於 \textit{Nephio} 監管下，能真實反映意圖轉譯與配置下發的時耗與準確性；而將 UE 獨立於編排管線之外，則能避免測試流量干擾編排面的信令交換，從而獲取更純粹的服務效能數據（如 Latency 與 PRB 佔用率）。
-    \item \textbf{測試腳本化與可重複性}：透過 \textit{Makefile} 封裝的 \textit{Helm} 指令（如 \texttt{make ue1}、\texttt{make gnu}），實驗環境能快速恢復至初始狀態，確保了跨切片驗證實驗的可重複性與嚴謹性。
-\end{enumerate}
-
-透過此編排策略，本研究建立了一個既能體現雲原生自動化編排特性，又具備高度測試靈活性的實驗床（Experimental Bed），為後續的端到端切片隔離驗證提供了堅實的架構基礎。
 
 \subsection{基於 GNU Radio 之多用戶射頻橋接機制}
 \label{subsec:gnuradio_bridge}
@@ -548,20 +393,10 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
     \end{tabular}
 \end{table}
 
-透過此橋接機制，本系統成功在 Kubernetes 叢集內構建了一個透明的虛擬射頻網絡，使得 \textit{srsran-operator} 下發的切片排程策略能透過此通道實質影響到不同用戶的服務品質。
-
-\subsection{多切片用戶設備（Multi-Slice UE）配置實作}
+\subsection{多切片用戶設備（Multi-Slice UE）配置}
 \label{subsec:multi_slice_ue_config}
 
-在本研究的驗證體系中，用戶設備（UE）端點必須能精確模擬異質業務的接入行為。透過 \texttt{srsran-helm} 專案，本系統實作了具備切片感知能力的多用戶配置架構，確保每個 UE 實例能與核心網及存取網中預定義的特定切片正確對接。
-
-\subsubsection{參數映射與 IMSI 管理}
-為了在模擬環境中區分不同業務屬性的用戶，本研究利用 Helm 的 \texttt{values.yaml} 機制實作了靜態參數映射。每個 UE 實例（UE1 與 UE2）均分配有唯一的國際行動用戶識別碼（IMSI），該識別碼與核心網 \textit{free5GC} 中的用戶訂閱資料嚴格對應。
-
-在配置邏輯上，UE1 被預定義為 eMBB 業務終端，其配置檔中指定了對應的 S-NSSAI（SST: 1, SD: 0x010203）；而 UE2 則被預定義為 URLLC 業務終端，請求 S-NSSAI（SST: 1, SD: 0x112233）。透過在 Helm 模板中將這些識別碼與特定的 ZMQ 虛擬介面埠號進行綁定，系統能在啟動時自動為不同切片建立專屬的射頻連線路徑。
-
-\subsubsection{異質切片驗證環境之實體對應}
-表 \ref{tab:ue_slice_mapping} 展示了用戶設備參數、網路切片識別碼與虛擬射頻端點之間的完整對應關係。此映射表直接證明了本實驗環境具備驗證「異質切片」併發運作的能力。透過將特定的物理埠號（ZMQ Ports）與邏輯切片（SD）進行一對一關聯，系統得以在共享的雲原生基礎設施上，模擬出兩條完全獨立的端到端流量路徑，從而為後續的資源隔離實驗提供了精確的受控對象。
+在本研究的驗證體系中，用戶設備（UE）端點必須能精確模擬異質業務的接入行為。透過 \texttt{srsran-helm} 專案，本系統實作了具備切片感知能力的多用戶配置架構，確保每個 UE 實例能與核心網及存取網中預定義的特定切片正確對接。表 \ref{tab:ue_slice_mapping} 詳細展示了用戶設備參數、網路切片識別碼與虛擬射頻端點之間的完整對應關係。
 
 \begin{table}[htbp]
     \centering
@@ -575,23 +410,7 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
     \end{tabular}
 \end{table}
 
-在實施過程中，測試人員僅需執行 \texttt{make ue1} 與 \texttt{make ue2} 指令，Operator 與 Helm 即可自動根據上述映射關係完成資源佈署。這種配置方式確保了測試端（UE）與基礎設施端（gNB/Core）在意圖執行後能達成狀態同步，使端到端的 SLA 保障機制得以在異質流量壓力下接受驗證。
-
 \subsection{端到端服務性能驗證工具鏈}
 \label{subsec:validation_toolchain}
 
-為量化驗證意圖驅動編排系統對網路切片之性能保障能力，本研究建立了一套標準化的性能驗證工具鏈。該工具鏈旨在自動化產生測試負載，並確保實驗數據在不同意圖配置下具備可重複性與嚴謹性。
-
-\subsubsection{流量產生機制與 Namespace 穿透技術}
-性能驗證之核心在於模擬真實業務負載。本系統利用 \texttt{iperf3} 工具產生受控的 UDP 流量，以模擬 eMBB 的大頻寬需求與 URLLC 的持續性小封包傳輸。
-
-由於 \textit{srsUE} 運行於獨立的容器環境中，其產生的切片流量經由核心網分發後，會導向用戶設備內的專屬虛擬網卡（\texttt{uesimtun0}）。為測得精確之端到端數據，測試程序需透過 Linux 的 \texttt{nsenter} 技術，穿透容器邊界並進入該 Pod 專屬的網路命名空間（Network Namespace）。透過在此命名空間內指定 \texttt{uesimtun0} 作為 I/O 介面，流量得以直接經由 5G 協議棧進行傳輸，從而排除宿主機網路環境的干擾。
-
-\subsubsection{自動化測試工作流 (Makefile Workflow)}
-為了提升實驗效率並消除人為操作之不確定性，本研究將複雜之部署、配置與壓測指令封裝於 \texttt{Makefile} 中，構建了自動化測試工作流：
-\begin{itemize}
-    \item \textbf{資源快速佈署}：透過 \texttt{make ue1} 與 \texttt{make ue2} 指令，系統能依照預定義的切片映射表（IMSI 與 S-NSSAI）快速啟動測試終端。
-    \item \textbf{可重複實驗路徑}：利用 \texttt{make iperf-ue1} 等封裝後的測試指令，系統會自動定位容器進程、進入命名空間並執行帶有特定參數（如頻寬、持續時間）的 \texttt{iperf3} 客戶端。
-\end{itemize}
-
-此套工具鏈將原本繁瑣的環境準備與數據採集過程轉化為可程式化的步驟，確保了第五章性能評估中，針對不同資源隔離策略（PRB Ratio 與 Priority）之測試結果皆能於一致且客觀的基準線上進行對比。
+為量化驗證意圖驅動編排系統對網路切片之性能保障能力，本研究建立了一套標準化的性能驗證工具鏈。該工具鏈旨在自動化產生測試負載，並確保實驗數據在不同意圖配置下具備可重複性與嚴謹性。性能驗證之核心在於模擬真實業務負載，本系統利用 \texttt{iperf3} 工具產生受控的 UDP 流量，以模擬 eMBB 與 URLLC 的頻寬需求。由於 \textit{srsUE} 運行於獨立的容器環境中，其產生的切片流量經由核心網分發後，會導向用戶設備內的專屬虛擬網卡（\texttt{uesimtun0}）。為測得精確之端到端數據，測試程序需透過 Linux 的 \texttt{nsenter} 技術，穿透容器邊界並進入該 Pod 專屬的網路命名空間（Network Namespace）。透過在此命名空間內指定 \texttt{uesimtun0} 作為 I/O 介面，流量得以直接經由 5G 協議棧進行傳輸，從而有效排除宿主機網路環境的干擾，確保實驗數據能真實反映切片資源隔離的效果。
