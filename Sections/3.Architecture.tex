@@ -3,7 +3,7 @@
 \section{系統架構設計}
 
 \subsection{系統分層設計}
-本研究設計並實作一套意圖驅動切片編排系統（Intent-Driven Slicing Orchestration System），旨在透過宣告式介面簡化網路切片之管理門檻。如圖 \ref{fig:system_arch} 所示，本系統在視覺架構上劃分為三個主要平面，並依據職能細分為四個管理層級，以符合 3GPP 服務化管理架構（SBMA）之解耦原則。
+本研究設計並實作一套意圖驅動切片編排系統（Intent-Driven Slicing Orchestration System），旨在透過宣告式介面簡化網路切片之管理門檻。如圖 \ref{fig:system_arch} 所示，本系統在視覺架構上劃分為三個主要平面，並依據職能細分為四個管理層級，以符合 3GPP 服務化管理架構之解耦原則。
 
 \begin{figure}[H]
     \centering
@@ -17,7 +17,7 @@
 
     \item \textbf{意圖編排與協調層（Intent Orchestration Layer）}：對應架構圖 Layer 2 之核心組件。本層級由 \textbf{E2E Orchestrator} 構成，實質承擔 \textbf{NSMF / Intent Handler} 之職能。其負責監聽北向介面之意圖請求，並執行意圖轉譯（Intent Translation），將抽象 SLA 期望精確映射為網域特定參數（如 Core 網域之 5QI 與 RAN 網域之 PRB 比例）。
 
-    \item \textbf{供應與南向介面層（Southbound Interface Layer）}：同樣位於 Layer 2 之管理叢集（Management Cluster）內，負責執行跨網域之編排指令下發。針對 RAN 網域，本系統整合 \textbf{Nephio Porch} 與 \textbf{Kpt Pipeline}，透過 \textbf{Git Repo} 實施配置套件之變更與發布；針對 Core 網域，則透過封裝之 \textbf{REST Client} 執行混合式編排，直接與核心網管理介面進行通訊。
+    \item \textbf{供應與南向介面層（Southbound Interface Layer）}：同樣位於 Layer 2 之管理叢集內，負責執行跨網域之編排指令下發。針對 RAN 網域，本系統整合 \textbf{Nephio Porch} 與 \textbf{Kpt Pipeline}，透過 \textbf{Git Repo} 實施配置套件之變更與發布；針對 Core 網域，則透過封裝之 \textbf{REST Client} 執行混合式編排，直接與核心網管理介面進行通訊。
 
     \item \textbf{網域執行與實施層（Domain Execution Layer）}：對應架構圖 Layer 3 之 NSSMF Domain。此層級負責將編排結果落實於實體網路環境，包含負責無線存取網網域調和之 \textbf{srsran-operator} 與負責核心網網域調和之 \textbf{free5gc-operator}。各 Operator 透過 \textbf{ConfigSync} 監聽期望狀態，並驅動實體網元（如 srsRAN 之 CU/DU 與 free5GC 之各個 NF）執行資源隔離與 QoS 配置。
 \end{enumerate}
@@ -25,7 +25,7 @@
 \subsection{意圖驅動工作流：從 SLA 期望到實體佈署之參數演化}
 \label{sec:intent_workflow_trace}
 
-為具體展示本系統如何落實「意圖驅動（Intent-driven）」理念，本節以同時請求 eMBB 與 URLLC 雙切片的情境為例，追蹤意圖參數在系統各層級間的轉譯與流轉過程。在此工作流中，系統將高度抽象的服務層級協議（SLA）期望，逐步解耦並轉化為實體存取網（DU）與核心網的底層配置。
+為具體展示本系統如何落實「意圖驅動（Intent-driven）」理念，本節以同時請求 eMBB 與 URLLC 雙切片的情境為例，追蹤意圖參數在系統各層級間的轉譯與流轉過程。在此工作流中，系統將高度抽象的服務層級協議期望，逐步解耦並轉化為實體存取網中的分散單元與核心網的底層配置。
 
 \subsubsection{階段一：意圖下發 (Intent Submission)}
 流程始於意圖擁有者（MnS Consumer）下發宣告式資源 \texttt{E2EQoSIntent}。如清單 \ref{lst:input_intent} 所示，該意圖隱蔽了所有 5G 底層技術細節，僅宣告業務端對網路效能的純粹期望。例如，eMBB 業務請求 \texttt{high} 頻寬與部分資源共享（\texttt{Partial}），而 URLLC 業務則嚴格要求 \texttt{ultra-low} 延遲與完全資源隔離（\texttt{Full}）。
@@ -54,7 +54,7 @@ spec:
 \end{lstlisting}
 
 \subsubsection{階段二：跨網域意圖轉譯 (Cross-Domain Translation)}
-E2E Orchestrator 接收到上述意圖後，其內建的轉譯引擎會依據 3GPP 規範與本地資源池狀態，將 SLA 期望轉譯為具體的網路參數，並回寫至該 CRD 的 \texttt{status} 欄位中（見清單 \ref{lst:translated_params}）。在此階段：
+E2E Orchestrator 接收到上述意圖後，其內建的轉譯引擎會依據 3GPP 規格與本地資源池狀態，將 SLA 期望轉譯為具體的網路參數，並回寫至該 CRD 的 \texttt{status} 欄位中（見清單 \ref{lst:translated_params}）。在此階段：
 \begin{itemize}
     \item \textbf{Core 參數}：URLLC 的超低延遲期望被精確映射至 \texttt{fiveQI: 85}。
     \item \textbf{RAN 參數}：eMBB 的 \texttt{Partial} 共享被映射為 PRB 比例 0-50\%（優先級 10）；而 URLLC 的 \texttt{Full} 隔離則被賦予最高 100\% 的 PRB 獲取權與極高的排程優先級（Priority 200）。此外，切片識別碼（SD）亦在此階段完成從十六進制（如 0x112233）至十進制（1122867）的系統內碼轉換。
@@ -99,7 +99,7 @@ spec:
 \end{lstlisting}
 
 \subsubsection{階段四：領域實體化與組態生成 (Domain Implementation)}
-當宣告式配置透過 GitOps 機制同步至工作負載叢集後，\texttt{srsran-operator} 將攔截此變更。Operator 會遞迴查找 \texttt{NFConfig} 內關聯的所有配置檔，並將 KRM 格式的抽象定義，最終轉化為實體 Distributed Unit (DU) 所需之應用層組態檔。如清單 \ref{lst:final_configmap} 所示，這標誌著從抽象意圖到實體 srsRAN \texttt{gnb-config.yml} 的最後一哩路，確保了切片排程演算法的正確掛載與執行。
+當宣告式配置透過 GitOps 機制同步至工作負載叢集後，\texttt{srsran-operator} 將攔截此變更。Operator 會遞迴查找 \texttt{NFConfig} 內關聯的所有配置檔，並將 KRM 格式的抽象定義，最終轉化為實體 Distributed Unit 所需之應用層組態檔。如清單 \ref{lst:final_configmap} 所示，這標誌著從抽象意圖到實體 srsRAN \texttt{gnb-config.yml} 的最後一哩路，確保了切片排程演算法的正確掛載與執行。
 
 \begin{lstlisting}[language=yaml, caption={srsRAN Operator 生成之最終 DU ConfigMap (片段)}, label={lst:final_configmap}]
 data:
@@ -127,15 +127,15 @@ data:
 
 本節將深入探討端到端編排器（E2E Orchestrator）的內部架構與實作細節。作為系統中的 \textit{NSMF} 與 \textit{Intent Handler}，該編排器負責介接北向的意圖管理服務，並透過異質的南向介面協調核心網與存取網資源。本節首先定義基於 KRM 的宣告式意圖模型，接著解析跨網域意圖轉譯引擎之演算法，最後分別論述 RAN 與 Core 網域之編排路徑設計，並說明基於狀態回饋的閉環監控機制。
 
-\subsection{宣告式意圖模型設計：\texttt{E2EQoSIntent} CRD 結構與 KRM 規範}
+\subsection{宣告式意圖模型設計：\texttt{E2EQoSIntent} CRD 結構與 KRM 規格}
 \label{subsec:intent_crd}
 
-為落實 3GPP 所倡導的意圖驅動網路管理（Intent-driven Network Management），本研究開發了名為 \texttt{E2EQoSIntent} 的自定義資源定義（Custom Resource Definition, CRD），作為系統北向的意圖管理服務介面（Intent Management MnS Interface）。
+為落實 3GPP 所倡導的意圖驅動網路管理（Intent-driven Network Management），本研究開發了名為 \texttt{E2EQoSIntent} 的自定義資源定義，作為系統北向的意圖管理服務介面（Intent Management MnS Interface）。
 
-相較於傳統基於 HTTP POST 方法的命令式（Imperative）切片建立 API（例如：\texttt{POST /slice}），本研究採用 Kubernetes 資源模型（Kubernetes Resource Model, KRM）來設計意圖介面，主要基於以下兩項架構優勢：
+相較於傳統基於 HTTP POST 方法的命令式切片建立 API（例如：\texttt{POST /slice}），本研究採用 Kubernetes 資源模型來設計意圖介面，主要基於以下兩項架構優勢：
 \begin{enumerate}
-    \item \textbf{最終一致性（Eventual Consistency）的保障}：在傳統命令式架構中，若 API 呼叫過程遭遇網路中斷或網元失效，系統狀態極易陷入不一致。透過 KRM 的宣告式（Declarative）設計，MnS Consumer 僅需定義「期望的最終狀態（Desired State）」。底層的 Kubernetes 控制迴圈（Control Loop）將持續不斷地比較「當前狀態（Current State）」與期望狀態，並自動執行調和（Reconciliation），從而在分散式環境中提供強健的容錯與自癒能力。
-    \item \textbf{業務意圖與基礎設施的解耦}：\texttt{E2EQoSIntent} 的資料結構被設計為高度抽象的服務層級協議（SLA），意圖擁有者無需具備 5G 底層技術領域知識（如 5QI 映射、PRB 分配算法），即可透過直觀的語意要求網路切片服務。
+    \item \textbf{最終一致性（Eventual Consistency）的保障}：在傳統命令式架構中，若 API 呼叫過程遭遇網路中斷或網元失效，系統狀態極易陷入不一致。透過 KRM 的宣告式設計，MnS Consumer 僅需定義「期望的最終狀態（Desired State）」。底層的 Kubernetes 控制迴圈（Control Loop）將持續不斷地比較「當前狀態（Current State）」與期望狀態，並自動執行調和（Reconciliation），從而在分散式環境中提供強健的容錯與自癒能力。
+    \item \textbf{業務意圖與基礎設施的解耦}：\texttt{E2EQoSIntent} 的資料結構被設計為高度抽象的服務層級協議，意圖擁有者無需具備 5G 底層技術領域知識（如 5QI 映射、PRB 分配算法），即可透過直觀的語意要求網路切片服務。
 \end{enumerate}
 
 清單 \ref{lst:input_intent} 展示了 \texttt{E2EQoSIntent} CRD 的 YAML 結構範例。該模型支援單一請求內包含多組意圖（\texttt{intentGroups}），每組意圖透過 \texttt{contexts} 綁定目標用戶設備（\texttt{targetUEs}，以 IMSI 識別），並在 \texttt{expectations} 區塊中宣告高階 SLA 指標，例如切片類型（\texttt{sliceType}）、延遲要求（\texttt{latency}）、頻寬需求（\texttt{bandwidth}）以及資源共享策略（\texttt{resourceShare}）。
@@ -146,12 +146,12 @@ data:
 
 在確立了宣告式意圖模型後，\textit{E2E Orchestrator} 內建的轉譯引擎（Translation Engine）負責將 \texttt{E2EQoSIntent} 中抽象的 SLA 期望（Expectations）解耦，並轉化為底層核心網與存取網可理解且可執行的領域特定參數。此轉譯過程消除了業務端高階需求與底層網路配置間的語意鴻溝（Semantic Gap）。
 
-轉譯引擎之對映演算法分為「核心網（Core）參數轉譯」與「存取網（RAN）參數轉譯」兩個平行維度：
+轉譯引擎之對映演算法分為「核心網參數轉譯」與「存取網參數轉譯」兩個平行維度：
 
-\subsubsection{核心網參數轉譯：基於 3GPP 規範之 5QI 映射}
-核心網的轉譯目標為 5G 服務品質識別碼（5G QoS Identifier, 5QI）與對應的 QoS Flow 參數。本演算法嚴格遵循 3GPP TS 23.501 標準中所定義的 QoS 特性進行映射：
+\subsubsection{核心網參數轉譯：基於 3GPP 規格之 5QI 映射}
+核心網的轉譯目標為 5G 服務品質識別碼與對應的 QoS Flow 參數。本演算法嚴格遵循 3GPP TS 23.501 標準中所定義的 QoS 特性進行映射：
 \begin{itemize}
-    \item \textbf{延遲敏感型業務映射 (URLLC)}：演算法將意圖中的 \texttt{latency} 指標映射至 3GPP 規範的延遲階級。例如，當業務需求宣告為超低延遲（\texttt{ultra-low}）時，引擎會將其精確映射至 \textbf{5QI 85}。在 3GPP 標準中，5QI 85 具備「延遲臨界（Delay Critical）」特性，專為保障嚴苛的錯誤率與延遲限制（Delay Bound）所設計。次之的 \texttt{low} 與 \texttt{medium} 延遲期望，則分別降級映射至 5QI 82 與 5QI 84。
+    \item \textbf{延遲敏感型業務映射 (URLLC)}：演算法將意圖中的 \texttt{latency} 指標映射至 3GPP 規格的延遲階級。例如，當業務需求宣告為超低延遲（\texttt{ultra-low}）時，引擎會將其精確映射至 \textbf{5QI 85}。在 3GPP 標準中，5QI 85 具備「延遲臨界（Delay Critical）」特性，專為保障嚴苛的錯誤率與延遲限制（Delay Bound）所設計。次之的 \texttt{low} 與 \texttt{medium} 延遲期望，則分別降級映射至 5QI 82 與 5QI 84。
     \item \textbf{頻寬需求型業務映射 (eMBB)}：針對 \texttt{bandwidth} 指標，演算法依據頻寬需求的嚴格程度，對應至 3GPP 中階級不同的 5QI。最高級別的 \texttt{dedicated-high} 映射至具備保證位元速率（GBR）特性的 5QI 4；而 \texttt{high} 與 \texttt{standard} 則分別映射至優先級遞減的非保證位元速率（Non-GBR）類別，即 5QI 6 與 5QI 9。
 \end{itemize}
 
@@ -165,10 +165,10 @@ data:
 \subsection{RAN 子網域編排路徑：基於 Nephio Porch 之宣告式封裝工作流}
 \label{subsec:ran_orchestration_path}
 
-在本系統的雙路徑派發架構中，存取網（RAN）子網域採用純宣告式（Declarative）的編排路徑。此路徑為本研究之核心實作貢獻之一，其突破了傳統命令式腳本在分散式環境下容易遭遇的狀態碎片化問題。\textit{E2E Orchestrator} 將 Nephio Porch 作為供應管理服務框架（Provisioning MnS Framework），透過操控 KRM 套件的生命週期，達成切片配置的自動化下發。
+在本系統的雙路徑派發架構中，存取網子網域採用純宣告式的編排路徑。此路徑為本研究之核心實作貢獻之一，其突破了傳統命令式腳本在分散式環境下容易遭遇的狀態碎片化問題。\textit{E2E Orchestrator} 將 Nephio Porch 作為供應管理服務框架，透過操控 KRM 套件的生命週期，達成切片配置的自動化下發。
 
 \subsubsection{基於狀態機之封裝編排工作流 (Package Orchestration Workflow)}
-為了將轉譯後的 PRB Ratio 與 Priority 等參數安全地套用至存取網，\textit{E2E Orchestrator} 內建了 \texttt{PorchClient}，並實作了一套完整的套件變更（Package Mutation）工作流。該工作流嚴格遵循 Porch 狀態機的移轉規範，涵蓋以下自動化步驟：
+為了將轉譯後的 PRB Ratio 與 Priority 等參數安全地套用至存取網，\textit{E2E Orchestrator} 內建了 \texttt{PorchClient}，並實作了一套完整的套件變更（Package Mutation）工作流。該工作流嚴格遵循 Porch 狀態機的移轉規格，涵蓋以下自動化步驟：
 
 \begin{enumerate}
     \item \textbf{建立草稿與提取 (Copy \& Pull)}：編排器首先以基礎藍圖（Blueprint）為範本，透過 \texttt{copy} 指令複製出一個全新的套件修訂版（PackageRevision）草稿，並將其拉取（Pull）至記憶體中進行處理。
@@ -187,10 +187,10 @@ data:
 \subsection{核心網子網域編排路徑：基於 REST API 之混合式異質整合機制}
 \label{subsec:core_orchestration_path}
 
-在本系統的架構設計中，核心網（Core Network）子網域採用「混合式編排（Hybrid Orchestration）」路徑。此設計不同於存取網（RAN）所採用的純宣告式套件編排，其核心考量在於現有開源核心網實作的功能限制，以及 5G QoS 機制的實施邏輯。
+在本系統的架構設計中，核心網子網域採用「混合式編排（Hybrid Orchestration）」路徑。此設計不同於存取網所採用的純宣告式套件編排，其核心考量在於現有開源核心網實作的功能限制，以及 5G QoS 機制的實施邏輯。
 
 \subsubsection{異質網域編排之實作困境與限制}
-在存取網端，如 \textit{srsRAN} 等實作允許透過修改網元組態檔（如 \texttt{cell\_cfg.slicing}）來定義特定切片的資源優先級與 PRB 比例。然而，鑑於現有開源核心網實作（如 \textit{free5GC}），其網路功能（NF）如 SMF 或 UPF 並不具備可供動態調整切片優先級的組態參數。核心網對切片服務品質（QoS）的控制，實質上是透過用戶設備（UE）的註冊資訊與服務合約（Subscription Data）進行綁定。
+在存取網端，如 \textit{srsRAN} 等實作允許透過修改網元組態檔（如 \texttt{cell\_cfg.slicing}）來定義特定切片的資源優先級與 PRB 比例。然而，鑑於現有開源核心網實作（如 \textit{free5GC}），其網路功能（NF）如 SMF 或 UPF 並不具備可供動態調整切片優先級的組態參數。核心網對切片服務品質（QoS）的控制，實質上是透過用戶設備的註冊資訊與服務合約（Subscription Data）進行綁定。
 
 意圖模型中所定義的 \textit{5QI} 參數，必須透過核心網的註冊機制注入 UE 上下文（UE Context），方能於 PDU 會話建立過程中將 QoS 需求傳遞至存取網，使 RAN 識別該 UE 所屬之切片特性。因此，\textit{E2E Orchestrator} 無法如同處理 RAN 網域般，單純透過 \textit{Nephio Porch} 修改 SMF/UPF 的宣告式組態來達成意圖。
 
@@ -209,7 +209,7 @@ data:
 意圖驅動編排的核心在於「閉環控制（Closed-loop Control）」邏輯，而有效的狀態回饋是落實閉環控制的前提。在本系統中，\textit{E2E Orchestrator} 利用 Kubernetes CRD 的 \texttt{status} 子資源實作了意圖監控機制，這不僅是用於呈現系統當前狀態，更構成了狀態回饋迴圈（Status Feedback Loop）的觀察基礎。
 
 \subsubsection{意圖達成狀態定義 (Fulfillment State)}
-為了使系統具備標準化的評估準則，本研究參考 3GPP TS 28.312 規範，在 \texttt{E2EQoSIntent} 的狀態模型中引入了「達成狀態（Fulfillment State）」指標。編排器會根據各子網域的回報，動態更新以下狀態：
+為了使系統具備標準化的評估準則，本研究參考 3GPP TS 28.312 規格，在 \texttt{E2EQoSIntent} 的狀態模型中引入了「達成狀態（Fulfillment State）」指標。編排器會根據各子網域的回報，動態更新以下狀態：
 \begin{itemize}
     \item \textbf{FULFILLED}：代表 RAN 與 Core 網域均已正確套用轉譯參數，且底層資源已成功實體化。
     \item \textbf{NOT\_FULFILLED}：代表意圖剛下發或轉譯、派發過程中遭遇錯誤（如 REST API 連線失敗或 Porch 套件衝突）。
@@ -221,7 +221,7 @@ data:
 \begin{enumerate}
     \item \textbf{處理階段 (Phase)}：追蹤編排器的處理進度（如 \texttt{Processing} 或 \texttt{Applied}）。
     \item \textbf{觀察世代 (Observed Generation)}：紀錄編排器最後一次處理的意圖版本，結合 Kubernetes 的 \texttt{metadata.generation} 機制，確保編排器能精確偵測到意圖的任何微小變更並觸發重新調和。
-    \item \textbf{網域特定狀態 (Domain Status)}：細分核心網（Core）與存取網（RAN）的實施狀態。例如，核心網狀態會反映 \textit{free5GC} 用戶註冊是否成功；存取網狀態則反映 \textit{Nephio} 套件是否完成 Approve 流程。
+    \item \textbf{網域特定狀態 (Domain Status)}：細分核心網與存取網的實施狀態。例如，核心網狀態會反映 \textit{free5GC} 用戶註冊是否成功；存取網狀態則反映 \textit{Nephio} 套件是否完成 Approve 流程。
     \item \textbf{達成目標 (Achieved Targets)}：將底層實施結果重新映射回業務語意（如 \texttt{bandwidth: achieved}），為 MnS Consumer 提供直觀的業務達成率報告。
 \end{enumerate}
 
@@ -250,7 +250,7 @@ status:
 \section{srsRAN 領域編排器與雲原生調和實作 (srsRAN Operator / RAN NSSMF)}
 \label{sec:ran_nssmf_implementation}
 
-本研究開發之 \texttt{srsran-operator} 擔任 3GPP 架構中的存取網切片子網域管理功能（RAN NSSMF）。該組件採用雲原生 Operator 模式，實作於工作負載叢集（Workload Cluster）中，負責將抽象的網路功能部署宣告轉化為實體的 \textit{srsRAN} 網元配置。本節將詳細論述其調和工作流與跨叢集生命週期管理機制。
+本研究開發之 \texttt{srsran-operator} 擔任 3GPP 架構中的存取網切片子網域管理功能（RAN NSSMF）。該組件採用雲原生 Operator 模式，實作於工作負載叢集中，負責將抽象的網路功能部署宣告轉化為實體的 \textit{srsRAN} 網元配置。本節將詳細論述其調和工作流與跨叢集生命週期管理機制。
 
 \subsection{NFDeployment 調和工作流 (Reconciliation Workflow)}
 \label{subsec:nfdeployment_workflow}
@@ -258,7 +258,7 @@ status:
 \texttt{srsran-operator} 的核心邏輯建立在對 Nephio \texttt{NFDeployment} 自定義資源（CR）的持續監聽與調和上。為了符合電信網路配置的多維度需求，本系統實作了一套「引用的遞迴查找（Reference Walking）」機制，確保配置的階層化與模組化。
 
 \subsubsection{引用遞迴查找機制 (Reference Walking)}
-Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的引用規範進行深度查找：
+Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的引用規格進行深度查找：
 
 \begin{enumerate}
     \item \textbf{入口點識別}：Operator 監聽 \texttt{NFDeployment} 資源。當偵測到 \texttt{spec.provider} 標註為 \texttt{gnb.srsran.io} 時，觸發調和程序。
@@ -291,10 +291,10 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
 \texttt{SrsRANConfig} 資源主要負責定義容器運行環境及模擬基礎設施相關參數，其核心功能在於解耦網元邏輯與底層部署環境。在網元生命週期管理中，該資源不僅指定了 CU-CP、CU-UP 與 DU 各組件所使用的容器鏡像版本，亦涵蓋了 ZMQ 虛擬射頻環境的關鍵配置，例如採樣率（\texttt{srate}）、發射增益（\texttt{txGain}）與接收增益（\texttt{rxGain}）等。
 
 \subsubsection{SrsRANCellConfig：物理與資源調度層 (Physical \& Scheduling Layer)}
-此資源是落實存取網切片意圖的核心關鍵，詳細定義了分散單元（DU）的實體參數以及無線資源排程策略。在物理層配置方面，其包含了下行絕對頻點識別碼（\texttt{dlArfcn}）、運作頻段（\texttt{band}）、通道頻寬與子載波間隔（\texttt{commonScs}）等參數。更重要的是，該資源承載了來自端到端編排器轉譯後的意圖參數，透過定義各組 S-NSSAI 專屬之最小與最大實體資源區塊比例（PRB Ratio）以及調度優先級（\texttt{Priority}），在底層排程器中實現無線資源的硬性隔離與差別化服務品質。
+此資源是落實存取網切片意圖的核心關鍵，詳細定義了分散單元的實體參數以及無線資源排程策略。在物理層配置方面，其包含了下行絕對頻點識別碼（\texttt{dlArfcn}）、運作頻段（\texttt{band}）、通道頻寬與子載波間隔（\texttt{commonScs}）等參數。更重要的是，該資源承載了來自端到端編排器轉譯後的意圖參數，透過定義各組 S-NSSAI 專屬之最小與最大實體資源區塊比例（PRB Ratio）以及調度優先級（\texttt{Priority}），在底層排程器中實現無線資源的硬性隔離與差別化服務品質。
 
 \subsubsection{PLMNConfig：網路識別層 (Network Identity Layer)}
-\texttt{PLMNConfig} 資源定義了行動網路的識別邏輯，確保用戶設備（UE）能正確識別並接取目標切片。該模型維護了特定追蹤區內支援的切片清單（S-NSSAI List），並由編排器執行自動化同步，確保此處的 SST/SD 資訊與 \texttt{SrsRANCellConfig} 中的排程器配置嚴格一致。
+\texttt{PLMNConfig} 資源定義了行動網路的識別邏輯，確保用戶設備能正確識別並接取目標切片。該模型維護了特定追蹤區內支援的切片清單（S-NSSAI List），並由編排器執行自動化同步，確保此處的 SST/SD 資訊與 \texttt{SrsRANCellConfig} 中的排程器配置嚴格一致。
 
 \subsection{電信雲化網路拓樸與邏輯介面管理 (Multus \& IPAM)}
 \label{subsec:multus_ipam_management}
@@ -338,7 +338,7 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
 \section{核心網網域之自動化編排與特殊化實作}
 \label{sec:core_domain_orchestration}
 
-在本系統中，核心網端的資源調和由 \texttt{free5gc-operator} 負責。該組件採用 \textit{Nephio} 官方發佈版本，其核心運作邏輯同樣基於 Kubernetes Operator 模式。由於 \texttt{free5gc-operator} 在監聽 \texttt{NFDeployment} 資源、執行調和（Reconcile）迴圈以及透過 KRM 狀態機維護資源最終一致性等方面，與前述 \ref{sec:ran_nssmf_implementation} 節所論述之 \texttt{srsran-operator} 具備高度架構相似性，故本節將重點轉向雲原生基礎設施自動化實作，透過自動化腳本確保工作負載叢集（Workload Cluster）節點具備承載 5G 邏輯介面的物理基礎，並向管理平台宣告精確的網路視圖。具體實作包含以下兩個核心維度：
+在本系統中，核心網端的資源調和由 \texttt{free5gc-operator} 負責。該組件採用 \textit{Nephio} 官方發佈版本，其核心運作邏輯同樣基於 Kubernetes Operator 模式。由於 \texttt{free5gc-operator} 在監聽 \texttt{NFDeployment} 資源、執行調和（Reconcile）迴圈以及透過 KRM 狀態機維護資源最終一致性等方面，與前述 \ref{sec:ran_nssmf_implementation} 節所論述之 \texttt{srsran-operator} 具備高度架構相似性，故本節將重點轉向雲原生基礎設施自動化實作，透過自動化腳本確保工作負載叢集節點具備承載 5G 邏輯介面的物理基礎，並向管理平台宣告精確的網路視圖。具體實作包含以下兩個核心維度：
 
 \begin{itemize}
     \item \textbf{基礎設施即代碼 (IaC)：虛擬介面與 VLAN 隔離實作}：本研究透過自動化指令集在 Workload Cluster 的 Worker 節點中建立必要的網路底層，包含利用 Linux \texttt{dummy} 技術建立名為 \texttt{eth1} 的虛擬主幹介面，並在其上劃分 VLAN 2 至 6 的子介面（如 \texttt{eth1.3} 承載 N2/N3 流量，\texttt{eth1.4} 承載 N4 流量）。這種封裝技術在單一物理網卡上實作了邏輯上的完全隔離，符合 3GPP 對於不同參考點安全性與效能隔離的要求。
@@ -349,7 +349,7 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
 \subsection{驗證環境之編排策略與職能分工}
 \label{subsec:validation_strategy}
 
-為了驗證意圖驅動編排系統在真實電信場景下的有效性，本研究構建了一個模擬實驗平台。在編排策略上，本系統採取了「基礎設施與測試資源分離」的設計原則，將受測系統（System Under Test, SUT）與模擬器（Emulator）在編排層級進行邏輯解耦。在本實驗環境中，網路元件依其職能被劃分為以下兩個不同的編排管道，以達成測試靈活性與環境真實性的平衡：
+為了驗證意圖驅動編排系統在真實電信場景下的有效性，本研究構建了一個模擬實驗平台。在編排策略上，本系統採取了「基礎設施與測試資源分離」的設計原則，將受測系統(System Under Test, SUT)與模擬器（Emulator）在編排層級進行邏輯解耦。在本實驗環境中，網路元件依其職能被劃分為以下兩個不同的編排管道，以達成測試靈活性與環境真實性的平衡：
 
 \begin{itemize}
     \item \textbf{Nephio 自動化管道 (受測系統)}：核心網元件（free5GC）與存取網組件（srsRAN CU/DU）被視為電信基礎設施的一部分。這些組件被納入基於 \textit{Nephio} 的 \textit{workload pipeline} 中，接受 \textit{E2E Orchestrator} 的宣告式意圖管理。此設計模擬了電信營運商在生產環境中，如何透過自動化管道對網路功能（NFs）執行完整的生命週期管理與切片參數配置。
@@ -362,7 +362,7 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
 在端到端切片驗證中，模擬多用戶（Multi-UE）併發存取的情境是評估資源隔離效能的關鍵。然而，在雲原生模擬環境中實作此架構面臨著特定的技術限制，本節論述如何透過 \textit{GNU Radio} 組件克服這些障礙並實作虛擬射頻橋接。
 
 \subsubsection{ZMQ 模擬限制之克服}
-\textit{srsRAN} 所提供的 ZMQ 模擬驅動程式在預設情況下主要設計為一對一的點對點連結。在標準配置中，分散單元（DU）與用戶設備（UE）之間的射頻訊號透過 TCP Socket 直接進行串流交換。
+\textit{srsRAN} 所提供的 ZMQ 模擬驅動程式在預設情況下主要設計為一對一的點對點連結。在標準配置中，分散單元與用戶設備之間的射頻訊號透過 TCP Socket 直接進行串流交換。
 
 這種點對點架構無法直接模擬行動通信中的廣播（Broadcast）與多路存取（Multiple Access）特性。若要驗證異質切片（如 eMBB 與 URLLC）在同一小區（Cell）下的競爭與隔離，系統必須具備將單一 DU 訊號分發至多個虛擬 UE 的能力。為此，本研究引入了 \textbf{GNU Radio Breaker} 作為射頻中繼層，打破了原本 1:1 的連線限制，建立起 1:N 的虛擬無線通道。
 
@@ -396,7 +396,7 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
 \subsection{多切片用戶設備（Multi-Slice UE）配置}
 \label{subsec:multi_slice_ue_config}
 
-在本研究的驗證體系中，用戶設備（UE）端點必須能精確模擬異質業務的接入行為。透過 \texttt{srsran-helm} 專案，本系統實作了具備切片感知能力的多用戶配置架構，確保每個 UE 實例能與核心網及存取網中預定義的特定切片正確對接。表 \ref{tab:ue_slice_mapping} 詳細展示了用戶設備參數、網路切片識別碼與虛擬射頻端點之間的完整對應關係。
+在本研究的驗證體系中，用戶設備端點必須能精確模擬異質業務的接入行為。透過 \texttt{srsran-helm} 專案，本系統實作了具備切片感知能力的多用戶配置架構，確保每個 UE 實例能與核心網及存取網中預定義的特定切片正確對接。表 \ref{tab:ue_slice_mapping} 詳細展示了用戶設備參數、網路切片識別碼與虛擬射頻端點之間的完整對應關係。
 
 \begin{table}[htbp]
     \centering
@@ -413,4 +413,4 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
 \subsection{端到端服務性能驗證工具鏈}
 \label{subsec:validation_toolchain}
 
-為量化驗證意圖驅動編排系統對網路切片之性能保障能力，本研究建立了一套標準化的性能驗證工具鏈。該工具鏈旨在自動化產生測試負載，並確保實驗數據在不同意圖配置下具備可重複性與嚴謹性。性能驗證之核心在於模擬真實業務負載，本系統利用 \texttt{iperf3} 工具產生受控的 UDP 流量，以模擬 eMBB 與 URLLC 的頻寬需求。由於 \textit{srsUE} 運行於獨立的容器環境中，其產生的切片流量經由核心網分發後，會導向用戶設備內的專屬虛擬網卡（\texttt{uesimtun0}）。為測得精確之端到端數據，測試程序需透過 Linux 的 \texttt{nsenter} 技術，穿透容器邊界並進入該 Pod 專屬的網路命名空間（Network Namespace）。透過在此命名空間內指定 \texttt{uesimtun0} 作為 I/O 介面，流量得以直接經由 5G 協議棧進行傳輸，從而有效排除宿主機網路環境的干擾，確保實驗數據能真實反映切片資源隔離的效果。
+為量化驗證意圖驅動編排系統對網路切片之性能保障能力，本研究建立了一套標準化的性能驗證工具鏈。該工具鏈旨在自動化產生測試負載，並確保實驗數據在不同意圖配置下具備可重複性與嚴謹性。性能驗證之核心在於模擬真實業務負載，本系統利用 \texttt{iperf3} 工具產生受控的 UDP 流量，以模擬 eMBB 與 URLLC 的頻寬需求。由於 \textit{srsUE} 運行於獨立的容器環境中，其產生的切片流量經由核心網分發後，會導向用戶設備內的專屬虛擬網卡（\texttt{uesimtun0}）。為測得精確之端到端數據，測試程序需透過 Linux 的 \texttt{nsenter} 技術，穿透容器邊界並進入該 Pod 專屬的網路命名空間(Network Namespace)。透過在此命名空間內指定 \texttt{uesimtun0} 作為 I/O 介面，流量得以直接經由 5G 協議棧進行傳輸，從而有效排除宿主機網路環境的干擾，確保實驗數據能真實反映切片資源隔離的效果。
