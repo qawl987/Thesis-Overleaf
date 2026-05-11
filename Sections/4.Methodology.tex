@@ -1,27 +1,111 @@
-\chapter{Data Fusion Algorithm}
-\label{ch:method}
+\chapter{實驗驗證與結果分析}
+\label{ch:evaluation}
 
-這個是插入圖片的範例, 圖片都放在img資料夾裡面. 檔案格式有支援: JPG, PNG, PDF, EPS. 就使用自己習慣的繪圖工具, 比較常見的應該就是power point!? power point可以把繪圖區另存成PDF, JPG, PNG, 還有SVG. SVG可以再轉成PDF, 這樣圖片縮放還是會很清楚, 可以把範例的兩張圖片都放大來看, 應該可以看出差別. 
+\section{實驗環境與測試場景設置}
+\label{sec:exp_setup}
+本節說明驗證本系統所需之軟硬體環境配置，並詳述如何透過虛擬化技術構建符合 3GPP 標準之多用戶實驗拓樸。
 
-最近常用的作法是, 先使用PPT畫一張大圖, 然後儲存成PDF, 如果有白邊想去除的話, 可以找線上網站裁切 (關鍵字: pdf crop free)
+\subsection{軟硬體環境配置}
+\label{subsec:exp_environment}
 
-圖片出現的位置是由latex去決定, 有時候會出現在奇怪的地方, 這時候只能多爬文、嘗試各種參數, 或者把整段圖片code放在前面試試看.
+本研究之驗證環境分為「實體環境基準測試」與「雲原生編排效能驗證」兩大部分。實體環境基準測試旨在建立未經編排框架介入時的網路效能底線，採用純本地部署方式；雲原生編排驗證則基於 Nephio 平台實施自動化管理與意圖轉譯實作。
 
-overleaf上有插入圖片的介紹: https://www.overleaf.com/learn/latex/Inserting\_Images
+表 \ref{tab:hardware_specs} 詳列了本研究使用之硬體設備規格。實體環境驗證（Local Test）運行於具備 Intel Core i7-10700 處理器之主機。而本研究提出之意圖驅動編排系統，其核心平台（Nephio）則部署於另一台具備 Intel Core i5-13500 處理器與 64GB 記憶體之主機，並透過 VirtualBox 虛擬化技術建構實驗環境。該虛擬機（VM）被分配 10 核心 CPU 與 32GB 記憶體，用以承載管理叢集（Management Cluster）與工作負載叢集（Workload Cluster）。
 
+\begin{table}[htbp]
+    \centering
+    \caption{實驗硬體環境規格}
+    \label{tab:hardware_specs}
+    \begin{tabular}{|l|l|l|l|}
+    \hline
+    \textbf{角色} & \textbf{處理器 (CPU)} & \textbf{記憶體 (RAM)} & \textbf{備註} \\ \hline
+    實體機測試主機 & Intel Core i7-10700 & 32 GB & 本地環境測試 \\ \hline
+    Nephio 宿主機 & Intel Core i5-13500 & 64 GB & 虛擬化底層 \\ \hline
+    編排驗證虛擬機 & 10 vCPU & 32 GB & VirtualBox VM \\ \hline
+    \end{tabular}
+\end{table}
 
-\begin{figure}[htb]
-	\centering
-	\includegraphics[width=0.9\textwidth]{img/data_preprocessing.png}
-	\caption{PNG Example.}
-	\label{fig:model}
-\end{figure}
+在軟體元件方面，本系統採用 MicroK8s v1.28 作為雲原生基礎設施平台。核心網實作採用 free5GC v4.2.1，無線存取網則基於 srsRAN release\_26\_04 版本。UE則採用官方配套使用的srsRAN 4G 專案中之 srsue v25.10版本，模組編排框架部分採用 Nephio R5，並結合本研究開發之 E2E Orchestrator 進行跨網域編排。表 \ref{tab:software_versions} 摘要了主要軟體元件之版本資訊。
 
+\begin{table}[htbp]
+    \centering
+    \caption{實驗軟體元件版本資訊}
+    \label{tab:software_versions}
+    \begin{tabular}{|l|l|l|}
+    \hline
+    \textbf{軟體元件} & \textbf{軟體名稱} & \textbf{版本}\\ \hline
+    容器編排平台 (CISM) & MicroK8s & v1.28\\ \hline
+    雲原生編排框架 & Nephio & R5 \\ \hline
+    核心網 (5G Core) & free5GC & v4.2.1 \\ \hline
+    無線存取網 (RAN) & srsRAN & release\_26\_04 \\ \hline
+    用戶設備模擬 (UE Emulator) & srsue submodule in srsRAN 4G & v25.10 \\ \hline
+    意圖編排器 & E2E Orchestrator (Golang/Kubebuilder) & \\ \hline
+    \end{tabular}
+\end{table}
 
-\section{Data Preprocessing}
-\label{sec:SMA}
-An example for section. Fig~\ref{fig:system_architecture} is PDF. Fig~\ref{fig:model} is PNG.
+值得注意的是，實體環境驗證採取 Local 部署路徑，網元間直接於 Ubuntu 系統進行對接測試，不涉及 Kubernetes 資源調度和意圖下發流程，以此確保量測數據能真實反映 srsRAN 與 free5GC 在該硬體環境下的原生效能。
 
+\subsection{測試指標與評估定義}
+\label{subsec:metrics_definition}
 
-\subsection{2D LiDAR Data}
-An example for subsection. 寫中文就是 圖~\ref{fig:system_architecture} 跟圖~\ref{fig:model}.
+為量化驗證意圖驅動編排系統在資源隔離與自動化流程中之效能，本研究定義了以下兩大類評估指標。第一類針對網路切片之數據面（Data Plane）服務品質保障，第二類則針對管理面（Management Plane）之編排效率。
+
+\subsubsection{數據面服務品質指標 (Data Plane QoS Metrics)}
+本研究利用 \texttt{iperf3} 工具產生 UDP 流量，模擬異質業務負載 。透過在用戶設備端之容器命名空間內進行量測，定義以下三項關鍵指標：
+\begin{itemize}
+    \item \textbf{吞吐量 (Throughput)}：單位時間內成功傳輸之有效位元速率（Bitrate）。
+    \item \textbf{封包遺失率 (Packet Loss Rate)}：未成功抵達接收端之數據包占總發送包之比例。此指標為衡量資源隔離有效性之核心，當 eMBB 與 URLLC 產生資源競爭時，系統應優先保障 URLLC 之低遺失率要求 。
+    \item \textbf{抖動 (Jitter)}：接收端封包到達時間之變動量。針對延遲敏感型業務（如 URLLC），低抖動是維持通訊穩定之必要條件。
+\end{itemize}
+
+\subsubsection{管理面編排效能指標 (Management Plane Metrics)}
+為評估本研究基於 Nephio 與 Kubernetes Operator 構建之編排管道效率，本研究定義了「端到端編排時延（End-to-End Orchestration Latency）」。此時延定義為從意圖擁有者下發指令，至實體網元配置生效之總耗時。
+
+依據本系統之工作流，總時延分為以下三個關鍵觀測點：
+\begin{equation}
+    T_{total} = T_{orchestration} + T_{sync} + T_{operator}
+\end{equation}
+
+其中各分項定義如下：
+\begin{itemize}
+    \item \textbf{編排與轉譯時延 ($T_{orchestration}$)}：定義為從 \texttt{E2EQoSIntent} 套用（$T_0$）至 Nephio Porch 完成套件修改與發佈（$T_1$）之時間。此階段反映了 E2E Orchestrator 之轉譯引擎效率。
+    \item \textbf{狀態同步時延 ($T_{sync}$)}：定義為從 Porch 完成發佈（$T_1$）至工作負載叢集之 ConfigSync 完成 Git 資源拉取（$T_2$）之時間。此階段受限於 GitOps 之輪詢週期。
+    \item \textbf{領域調和時延 ($T_{operator}$)}：定義為 \texttt{srsran-operator} 監聽到資源變更並生成最終實體 \texttt{ConfigMap}（$T_3$）之耗時。此指標反映了本研究開發之 NSSMF 邏輯執行效率。
+\end{itemize}
+
+\subsubsection{意圖達成狀態指標 (Intent Fulfillment Metrics)}
+除了量化指標外，本研究亦根據 3GPP TS 28.312 定義之達成狀態（Fulfillment State）作為定性分析依據 。系統會透過 CRD 的 \texttt{status} 欄位回饋 \texttt{FULFILLED} 或 \texttt{NOT\_FULFILLED} 標籤，用以判定網域特定參數（如 5QI 與 PRB Ratio）是否已正確實體化於目標環境中。
+
+\section{端到端切片效能隔離驗證}
+\label{sec:slice_performance}
+本節透過兩組對照實驗，驗證本系統在不同部署環境下對 eMBB 與 URLLC 切片之資源隔離能力。
+
+\subsection{實驗一：實體環境下之跨網域 QoS 驗證}
+驗證在核心網未具備動態 QoS 機制下，僅透過 RAN NSSMF 之 PRB 與 Priority 排程達成端到端隔離之可行性。
+
+\subsection{實驗二：Nephio 雲原生部署之一致性驗證}
+驗證在 Kubernetes 環境下，透過 srsran-operator 自動化下發配置後，其切片隔離效能是否與實體部署環境具備一致性。
+
+\section{意圖驅動編排效率評估}
+\label{sec:orchestration_efficiency}
+本節旨在量化評估本編排架構在電信雲自動化流程中之時效性能。
+
+\subsection{實驗三：編排工作流時延分析}
+\label{subsec:latency_analysis}
+透過量測從 Intent apply 至實體網元配置生效（ConfigMap 更新）之端到端時延，評估 NSMF 與 Provisioning MnS Framework 之運作效率。
+
+\subsection{階段耗時分解與討論}
+針對意圖轉譯、GitOps 同步以及 Operator 執行等不同階段之時延進行拆解分析，並探討系統之擴展性。
+
+\section{意圖自動化轉譯與自癒功能驗證}
+\label{sec:functional_validation}
+本節針對編排系統之功能正確性進行定性分析。
+
+\subsection{轉譯引擎準確性分析}
+驗證 SLA 期望指標是否能精確映射為 3GPP 定義之 5QI 參數與 RAN 網域之 PRB 比例。
+
+\subsection{狀態回饋與自癒閉環驗證}
+展示系統如何透過 CRD Status 追蹤意圖達成狀態，並在配置漂移時透過控制迴圈（Control Loop）達成自動化修復。
+
+\section{本章小結}
+總結實驗結果，確認本研究提出之架構能有效簡化切片管理門檻並保障端到端服務品質。
