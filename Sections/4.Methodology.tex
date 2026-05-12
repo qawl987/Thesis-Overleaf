@@ -132,9 +132,42 @@ slicing:
 \subsubsection{實驗限制討論}
 本實驗雖達成預期隔離效果，但受限於以下因素：首先，\texttt{srsue} 為純軟體模擬，需處理極高之信號採樣率與完整之 L1/L2/L3 協議棧，效能高度依賴主機 CPU 運算能力。誠如 srsRAN 官方文檔所述，該模擬器主要用於可行性驗證而非大規模性能壓力測試。其次，由於 free5GC 之 \texttt{gtp5g} 模組尚未實作不同 5QI 之優先級發送功能，因此目前的隔離效果完全仰賴於 srsRAN 端之排程配置，核心網端尚未具備主動之 QoS 優先發送機制。
 
-% \subsection{實驗二：Nephio 雲原生部署之一致性驗證}
-% 驗證在 Kubernetes 環境下，透過 srsran-operator 自動化下發配置後，其切片隔離效能是否與實體部署環境具備一致性。
+\subsection{實驗二：Nephio 雲原生部署之一致性驗證}
+\label{subsec:k8s_qos_consistency}
 
+在確立實體環境之效能基準後，本實驗旨在驗證本系統於雲原生環境下，透過 Nephio 自動化編排框架實施切片資源隔離之一致性。本實驗將 5G 網元部署於基於 MicroK8s 之虛擬化環境中，並由 E2E Orchestrator (NSMF) 進行意圖轉譯與參數下發，藉此評估雲原生架構對網路切片效能之影響。
+
+\subsubsection{實驗設計與環境優化策略}
+本實驗之網元部署完全遵循第 \ref{sec:ran_nssmf_implementation} 節所述之 Nephio 工作流。實驗註冊兩組用戶設備（UE），其配置與 3GPP 參數對應關係維持與實驗一一致。
+
+考量到工作負載叢集運行於 VirtualBox 虛擬機環境，虛擬化層級之介入易導致頻繁之內核上下文切換（Context Switch），進而引發 CPU 使用率異常飆升與網元效能下降。為此，本研究在 srsRAN 之 \texttt{expert\_execution} 參數中引入了優化配置，如清單 \ref{lst:vm_optimization} 所示。透過調整執行緒之退避週期（Backoff Period），有效緩解了虛擬化環境下之運算壓力，確保模擬器之協議棧能在受限資源下維持穩定運作。
+
+\begin{lstlisting}[language=yaml, caption={針對虛擬化環境之 srsRAN 執行緒優化配置}, label={lst:vm_optimization}]
+expert_execution:
+  threads:
+    main_pool:
+      backoff_period: 1000
+\end{lstlisting}
+
+\subsubsection{測試程序與流量實施}
+測試流程採用與實驗一相同之三階段模型（0--15--45--60s）。為精確模擬容器環境下之業務接入，本研究利用 \texttt{nsenter} 工具穿透容器邊界，進入 UE Pod 專屬之網路命名空間，並將 \texttt{iperf3} 流量綁定於隧道介面 \texttt{uesimtun0}。受測流量之目標端點為部署於 UPF Pod 內之虛擬介面，以排除外部網路之不確定變因。
+
+\subsubsection{實驗結果分析與討論}
+實驗結果如圖 \ref{fig:k8s_urllc_vs_embb} 所示。整體效能走勢與實體環境實驗（實驗一）展現高度一致性：
+\begin{itemize}
+    \item \textbf{資源競爭行為}：在第 15 秒加入 URLLC 流量後，系統能精確落實由 Nephio 編排之 PRB 優先級政策。數據顯示 URLLC 流量能穩定維持在約 1.42 Mbits/sec 的傳輸速率，而 eMBB 則因資源被奪取而導致吞吐量大幅下降至約 215 Kbits/sec，且伴隨明顯之延遲抖動上升。
+    \item \textbf{虛擬化損耗評估}：受限於 VM 與 Kubernetes 網路層（Multus/CNI）之封裝開銷，本實驗之最大可用吞吐量設定為 1.5 Mbps，較實體機之 3 Mbps 為低。這證實了在雲原生環境下，雖然資源隔離邏輯（PRB/Priority）能正確實施，但底層虛擬化與 CISM 平台之介入確實會引入額外之處理成本。
+    \item \textbf{隔離有效性確認}：儘管絕對流量值受限，但在 45 秒 URLLC 流量結束後，eMBB 之吞吐量隨即恢復至 1.5 Mbps 以上之水準，證明本研究開發之二層編排架構能確保宣告式意圖在動態變化的容器環境中仍能維持最終一致性之資源保障。
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1.0\linewidth]{img/4.2.2-urllc-vs-embb.png}
+    \caption{Nephio 雲原生環境下之雙切片效能驗證與隔離分析圖}
+    \label{fig:k8s_urllc_vs_embb}
+\end{figure}
+
+綜上所述，實驗二驗證了本系統具備跨環境之配置一致性。這代表透過 E2E Orchestrator 對 Nephio Porch 進行自動化套件生命週期管理（Mutation/Approve），能如同手動配置般精確地驅動 NSSMF (Operator) 達成存取網域之 QoS 隔離目標。
 
 \section{意圖驅動編排效率評估}
 \label{sec:orchestration_efficiency}
