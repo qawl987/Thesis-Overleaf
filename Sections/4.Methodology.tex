@@ -169,26 +169,80 @@ expert_execution:
 
 綜上所述，實驗二驗證了本系統具備跨環境之配置一致性。這代表透過 E2E Orchestrator 對 Nephio Porch 進行自動化套件生命週期管理（Mutation/Approve），能如同手動配置般精確地驅動 NSSMF (Operator) 達成存取網域之 QoS 隔離目標。
 
-\section{意圖驅動編排效率評估}
-\label{sec:orchestration_efficiency}
-本節旨在量化評估本編排架構在電信雲自動化流程中之時效性能。
+\section{意圖驅動編排效率與閉環功能評估}
+\label{sec:orchestration_evaluation}
 
-\subsection{實驗三：編排工作流時延分析}
+本節旨在量化評估本編排系統在電信雲自動化流程中之時效性能，並驗證其閉環控制（Closed-loop Control）機制之正確性。不同於前述針對數據面（Data Plane）的效能測試，本實驗著重於管理面（Management Plane）從高階意圖下發到實體網元配置生效的完整管道。
+
+\subsection{驗證方法論與自動化工具}
+\label{subsec:methodology_tools}
+
+為確保測試結果之嚴謹性與可重複性，本研究開發了一套整合量測與驗證腳本。該工具模仿 MnS Consumer 之行為，透過 Kubernetes API 下發如清單 \ref{lst:input_intent} 所示之宣告式意圖，並同時執行以下兩項任務：
+
+\begin{enumerate}
+    \item \textbf{時延追蹤}：透過輪詢（Polling）管理平面日誌與工作負載叢集之資源版本（Resource Version），詳細追蹤各階段時間戳記：
+    \begin{enumerate}[label=(\alph*), topsep=0pt, partopsep=0pt]
+        \item \textbf{T0 (Intent Applied)}：記錄 \texttt{E2EQoSIntent} 資源套用至 Kubernetes API Server 之時刻。
+        \item \textbf{T1 (Porch Complete)}：監控編排器日誌，當偵測到 Nephio Porch 完成套件審批（Approved package）信號時記錄。此階段代表 \textit{NSMF} 轉譯與發佈完成。
+        \item \textbf{T2 (ConfigSync Complete)}：透過輪詢工作負載叢集之 \texttt{SrsRANCellConfig} 自定義資源版本（Resource Version），當偵測到版本更新時記錄。此階段代表 GitOps 同步作業完成。
+        \item \textbf{T3 (ConfigMap Updated)}：監控最終實體 \texttt{ConfigMap} 之版本變更。此階段代表 \textit{NSSMF}（srsran-operator）完成本地調和與實體化配置。
+    \end{enumerate}
+    
+    \item \textbf{閉環一致性校驗}：依據系統預期之狀態模型（如清單 \ref{lst:intent_status} 所示），自動比對意圖達成狀態與底層實體配置之「真值（Ground Truth）」，確保宣告式狀態機正確轉移。
+\end{enumerate}
+
+\subsection{編排工作流時延分析}
 \label{subsec:latency_analysis}
-透過量測從 Intent apply 至實體網元配置生效（ConfigMap 更新）之端到端時延，評估 NSMF 與 Provisioning MnS Framework 之運作效率。
 
-\subsection{階段耗時分解與討論}
-針對意圖轉譯、GitOps 同步以及 Operator 執行等不同階段之時延進行拆解分析，並探討系統之擴展性。
+本實驗針對 \texttt{resourceShare} 指標之變更執行了 10 次重複量測。圖 \ref{fig:orchestration_latency_stats} 展示了各編排階段之處理時延統計分佈。表 \ref{tab:latency_sample} 則展示了其中一次量測數據。
 
-\section{意圖自動化轉譯與自癒功能驗證}
-\label{sec:functional_validation}
-本節針對編排系統之功能正確性進行定性分析。
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1.0\linewidth]{img/4.3.2-latency.png}
+    \caption{意圖驅動編排管道各階段時延分布統計圖}
+    \label{fig:orchestration_latency_stats}
+\end{figure}
 
-\subsection{轉譯引擎準確性分析}
-驗證 SLA 期望指標是否能精確映射為 3GPP 定義之 5QI 參數與 RAN 網域之 PRB 比例。
+實驗數據顯示，端到端總時延（$T_{total}$）之中位數落在 32 秒左右。分析各階段耗時如下：
+\begin{itemize}
+    \item \textbf{NSMF 轉譯與發布 ($T_1 - T_0$)}：平均耗時約 7.35 秒。此階段包含 E2E Orchestrator 進行意圖解析與對應之 Nephio Porch 套件審批流程。
+    \item \textbf{GitOps 狀態同步 ($T_2 - T_1$)}：平均耗時約 22.66 秒。此為全流程之主要時延來源，係因 ConfigSync 受限於 Git 倉庫之輪詢週期與網絡同步開銷。
+    \item \textbf{NSSMF 實體化配置 ($T_3 - T_2$)}：平均耗時僅約 0.06 秒。實驗證實本研究開發之 \texttt{srsran-operator} 能在監聽到資源變更後，近乎即時地生成實體網元組態檔。
+\end{itemize}
 
-\subsection{狀態回饋與自癒閉環驗證}
-展示系統如何透過 CRD Status 追蹤意圖達成狀態，並在配置漂移時透過控制迴圈（Control Loop）達成自動化修復。
+\begin{table}[htbp]
+    \centering
+    \caption{單次端到端編排時延量測範例}
+    \label{tab:latency_sample}
+    \begin{tabular}{|l|l|}
+    \hline
+    \textbf{編排階段} & \textbf{持續時間 (秒)} \\ \hline
+    E2E Orchestrator + Porch ($T_1 - T_0$) & 7.348s \\ \hline
+    ConfigSync (Git $\rightarrow$ Cluster) ($T_2 - T_1$) & 22.659s \\ \hline
+    srsran-operator (ConfigMap) ($T_3 - T_2$) & 0.068s \\ \hline \hline
+    \textbf{總時延 (TOTAL)} & \textbf{30.077s} \\ \hline
+    \end{tabular}
+\end{table}
 
-\section{本章小結}
-總結實驗結果，確認本研究提出之架構能有效簡化切片管理門檻並保障端到端服務品質。
+\subsection{閉環控制與功能一致性驗證}
+\label{subsec:closed_loop_validation}
+
+為驗證系統之「最終一致性」保障能力，本研究透過自動化腳本對各管理層級之回饋狀態進行深度檢驗。此驗證流程確保了系統不僅完成配置下發，且能準確觀察並回報實施結果。
+
+\subsubsection{意圖狀態回饋驗證}
+依據 3GPP TS 28.312 規範，本研究驗證了 \texttt{E2EQoSIntent} 資源之 \texttt{status} 子資源。如清單 \ref{lst:intent_status} 所示，腳本確認了以下關鍵指標：
+\begin{itemize}
+    \item \textbf{Fulfillment State}：驗證其標記為 \texttt{FULFILLED}，代表跨網域轉譯與派發指令均已正確執行。
+    \item \textbf{Observed Generation}：驗證編排器所觀察到之世代（Generation）與意圖模型之元數據一致，確保無配置漂移或處理遺漏。
+    \item \textbf{Domain Specific Status}：確認 RAN 網域與 Core 網域之狀態分別處於 \texttt{CONFIGURED}，且包含對應之 5QI 與切片識別碼資訊。
+\end{itemize}
+
+\subsubsection{NSSMF 實施與實體配置一致性校驗}
+在工作負載叢集端，驗證腳本進一步比對了 \texttt{NFDeployment} 資源之 \texttt{Ready} 條件與 \texttt{resourceCreation} 標記，確認 \texttt{srsran-operator} 已成功完成資源聚合。
+
+最終，腳本穿透容器邊界檢索實體 DU 之 \texttt{gnb-config.yml} 內容。實驗證實，實體組態檔中之 \texttt{slicing} 陣列內，其 SST、SD 以及關鍵之 \texttt{max\_prb\_policy\_ratio} 與 \texttt{priority} 參數，均與北向意圖之高階期望完全吻合。此「從意圖模型到實體組態」的端到端校驗，證明了本系統在雲原生環境下達成閉環控制之可靠性。
+
+\section{本章總結}
+\label{sec:chapter_summary}
+
+本章透過三項關鍵實驗完整驗證了本研究所提之架構。實驗一確立了實體環境下之資源隔離基準；實驗二證明了 Nephio 雲原生編排能達成與實體環境一致之隔離效能；實驗三則量化了編排時延，並透過閉環機制確認了配置之最終一致性。實驗結果顯示，本系統能有效將抽象業務期望轉化為實體網絡保障，同時大幅降低了跨網域切片之管理門檻。
