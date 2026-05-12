@@ -81,10 +81,60 @@
 本節透過兩組對照實驗，驗證本系統在不同部署環境下對 eMBB 與 URLLC 切片之資源隔離能力。
 
 \subsection{實驗一：實體環境下之跨網域 QoS 驗證}
-驗證在核心網未具備動態 QoS 機制下，僅透過 RAN NSSMF 之 PRB 與 Priority 排程達成端到端隔離之可行性。
+\label{subsec:local_qos_verification}
 
-\subsection{實驗二：Nephio 雲原生部署之一致性驗證}
-驗證在 Kubernetes 環境下，透過 srsran-operator 自動化下發配置後，其切片隔離效能是否與實體部署環境具備一致性。
+本實驗旨在建立未經雲原生編排框架介入時之網絡效能基準，透過在 Ubuntu 實體主機上直接部署 srsRAN 與 free5GC，驗證 5G 協議棧在無線存取網端實施資源隔離的可行性。本實驗不涉及 Kubernetes 資源調度與意圖轉譯流程，僅作為後續自動化編排之效能對照組。
+
+\subsubsection{實驗設計與環境配置}
+本實驗註冊兩組用戶設備（UE），其 IMSI 與切片對應關係如表 \ref{tab:ue_slice_mapping} 所示。在 QoS 參數設定上，eMBB 切片採用 5QI 9（Non-GBR），而 URLLC 切片則配置為 5QI 82（Delay Critical GBR）。
+
+清單 \ref{lst:local_du_config} 展示了本實驗所採用之雙切片排程參數。
+
+\begin{lstlisting}[language=yaml, caption={實體機實驗之 DU 雙切片排程配置參數}, label={lst:local_du_config}]
+slicing:
+  - # Slice 1: eMBB (5QI=9)
+    sst: 1
+    sd: 66051
+    sched_cfg:
+      min_prb_policy_ratio: 0
+      max_prb_policy_ratio: 50
+      priority: 10
+
+  - # Slice 2: URLLC (5QI=82)
+    sst: 1
+    sd: 1122867
+    sched_cfg:
+      min_prb_policy_ratio: 0
+      max_prb_policy_ratio: 100
+      priority: 200
+\end{lstlisting}
+
+\subsubsection{測試程序與流量模型}
+本實驗利用 \texttt{iperf3} 工具模擬真實業務負載。為排除外網延遲干擾，測試流量於本機建立之 \texttt{dummy interface} 上運行，並透過網路命名空間（Network Namespace）與 \texttt{bind-dev} 技術強制流量進入 UE 之隧道介面。測試流程定義如下：
+
+\begin{enumerate}
+    \item \textbf{階段一 (0--15s)}：啟動 eMBB 流量測試（UE1），設定為 5 Mbps 之 UDP 負載。
+    \item \textbf{階段二 (15--45s)}：於第 15 秒加入 URLLC 流量測試（UE2），設定為 1 Mbps 之 UDP 負載，模擬異質切片競爭無線資源之情境。
+    \item \textbf{階段三 (45--60s)}：於第 45 秒停止 URLLC 流量，觀察 eMBB 業務之恢復情形。
+\end{enumerate}
+
+\subsubsection{實驗結果分析}
+實驗結果如圖 \ref{fig:urllc_vs_embb_result} 所示。透過時序圖表可觀察到系統在不同階段之效能特徵：在階段一（0--15s），僅有 eMBB 運行時，流量可吃滿預設頻寬且維持極低之掉包率。進入階段二（15--45s）後，隨 URLLC 流量加入，srsRAN 排程器依據清單 \ref{lst:local_du_config} 之優先級定義，優先保障 URLLC 之傳輸，使其吞吐量與延遲幾乎不受影響；相對地，eMBB 之 PRB 資源受限，導致其 Loss Rate 與 Jitter 值顯著飆高。進入階段三（45s 後），隨 URLLC 流量結束，eMBB 立即恢復至正常效能水平。
+值得注意的是，eMBB 之掉包率在競爭初期（15--40s）並未立即上升，主要係因 srsRAN L2 緩衝區（Buffering）機制使封包仍能按序排隊發送，未產生序號斷層；直至第 40 秒左右因緩衝區溢位或封包超時拋棄機制觸發，導致 \texttt{iperf3} 偵測到大量封包序號中斷，掉包率才呈現爆發性增長。此結果證實了透過修改存取網組態落實雙切片隔離之有效性。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1.0\linewidth]{img/4.2.1-urllc-vs-embb.png}
+    \caption{實體環境下 eMBB 與 URLLC 切片之效能競爭與隔離分析圖}
+    \label{fig:urllc_vs_embb_result}
+\end{figure}
+
+\subsubsection{實驗限制討論}
+本實驗雖達成預期隔離效果，但受限於以下因素：首先，\texttt{srsue} 為純軟體模擬，需處理極高之信號採樣率與完整之 L1/L2/L3 協議棧，效能高度依賴主機 CPU 運算能力。誠如 srsRAN 官方文檔所述，該模擬器主要用於可行性驗證而非大規模性能壓力測試。其次，由於 free5GC 之 \texttt{gtp5g} 模組尚未實作不同 5QI 之優先級發送功能，因此目前的隔離效果完全仰賴於 srsRAN 端之排程配置，核心網端尚未具備主動之 QoS 優先發送機制。
+
+% \subsection{實驗二：Nephio 雲原生部署之一致性驗證}
+% 驗證在 Kubernetes 環境下，透過 srsran-operator 自動化下發配置後，其切片隔離效能是否與實體部署環境具備一致性。
+
 
 \section{意圖驅動編排效率評估}
 \label{sec:orchestration_efficiency}
