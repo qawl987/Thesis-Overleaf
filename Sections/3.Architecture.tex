@@ -1,4 +1,4 @@
-\chapter{System Model}
+\chapter{系統架構}
 
 \section{系統架構設計}
 
@@ -63,7 +63,17 @@ E2E Orchestrator 接收到上述意圖後，其內建的轉譯引擎會依據 3G
 \begin{lstlisting}[language=yaml, caption={E2E Orchestrator 轉譯後之參數狀態 (片段)}, label={lst:translated_params}]
 status:
   intentGroupStatuses:
-    # ... (eMBB 轉譯略) ...
+    - id: embb
+      translatedParams:
+        coreParams:
+          fiveQI: 9
+          qfi: 9
+        ranParams:
+          sst: 1
+          sd: 66051      # 對應 0x010203
+          minPrbPolicyRatio: 0
+          maxPrbPolicyRatio: 50
+          priority: 10
     - id: urllc
       translatedParams:
         coreParams:
@@ -177,7 +187,7 @@ data:
     \item \textbf{批准發佈 (Approve)}：最終，編排器觸發 \texttt{Approve} 操作，正式發佈該套件。此動作將觸發底層 CISM (Cluster Infrastructure \& Service Management) 代理程式（如 ConfigSync）的同步機制，將配置派發至目標工作負載叢集。
 \end{enumerate}
 
-\subsubsection{宣告式編排之學術與工程價值}
+\subsubsection{宣告式編排之特性}
 透過上述基於 Nephio Porch 的工作流實作，本系統在 RAN 網域的編排上達成了兩項關鍵的雲原生工程特性：
 \begin{itemize}
     \item \textbf{具備可追溯性之版本控制 (Version Control)}：所有針對 RAN 切片參數的修改，皆被封裝為不可變的修訂版本（PackageRevision）。這使得網路配置具備了類似軟體程式碼的「單一事實來源（Single Source of Truth, SSOT）」，當意圖發生衝突或配置失效時，系統具備退回（Rollback）至前一穩定版本的基礎能力。
