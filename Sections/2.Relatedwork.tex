@@ -117,13 +117,13 @@ ETSI NFV-MANO（Management and Orchestration）框架為電信等級之虛擬化
 
 \subsection{意圖驅動管理之標準化演進與發展趨勢}
 
-意圖驅動管理（Intent-Driven Management, IDM）作為達成高階網路自動化與自治網路（Autonomous Networks）的核心範式，其標準化進程主要由 3GPP SA5 工作組（Telecom Management）於 TS 28.312 規範中進行定義。隨著行動通訊網路規模的擴大與雲原生技術的導入，3GPP 對於意圖管理的架構與機制進行了跨多個版本的演進。本節將梳理 3GPP Release 17、Release 18 至 Release 19 在意圖驅動管理上的技術演進軌跡與未來發展趨勢。
+意圖驅動管理（Intent-Driven Management, IDM）作為達成高階網路自動化與自治網路（Autonomous Networks）的核心範式，其標準化進程主要由 3GPP SA5 工作組（Telecom Management）於 TS 28.312 規格中進行定義。隨著行動通訊網路規模的擴大與雲原生技術的導入，3GPP 對於意圖管理的架構與機制進行了跨多個版本的演進。本節將梳理 3GPP Release 17、Release 18 至 Release 19 在意圖驅動管理上的技術演進軌跡與未來發展趨勢。
 
 \subsubsection{3GPP Release 17：基礎概念與架構模型之奠定}
 
 在 Release 17 中，3GPP 首次確立了意圖驅動管理的基礎概念模型。意圖被正式定義為「對系統期望狀態之宣告式描述」，其核心特徵在於聚焦於描述「期望達成之目標（What）」，而非「如何達成該目標（How）」。這種宣告式架構賦予了網路高度的靈活性，使底層管理服務生產者（MnS Producer）得以在不受技術細節制約的前提下，自主探索最佳的資源調度方案。
 
-根據 Release 17 規範，一個完整的意圖內容被抽象化為階層式的資訊模型（Information Service, IS），其包含以下關鍵要素：
+根據 Release 17 規格，一個完整的意圖內容被抽象化為階層式的資訊模型（Information Service, IS），其包含以下關鍵要素：
 \begin{itemize}
     \item \textbf{意圖期望（Intent Expectation）}：定義特定管理需求下，期望對象所應具備的特徵集合。
     \item \textbf{期望對象（Expectation Objects）}：意圖所作用的實體或邏輯網元（如網路切片或子網）。當缺乏明確標識符時，可透過對象上下文（\texttt{objectContext}）以過濾條件（如地理位置、網元類型）進行動態篩選。
@@ -154,13 +154,13 @@ ETSI NFV-MANO（Management and Orchestration）框架為電信等級之虛擬化
 最新的 Release 19 代表意圖驅動管理從「單向命令與反饋」走向「雙向自動化協商」與「量化決策優化」的重大轉型，其核心演進包含以下三個維度：
 
 \textbf{1. 意圖協商機制（Intent Negotiation Functionalities）} \\
-Release 19 將意圖的動態互動劃分為兩個核心階段。首先是「意圖預評估階段（Pre-evaluation Phase）」，在不變更網絡實體配置的前提下，透過意圖探索（Intent Exploration）尋求最契合當前網路能力的意圖邊界；其次是「意圖履行階段（Fulfilment Phase）」，當存在多個可行部署路徑且各具技術利弊時，允許 Producer 與 Consumer 針對可達成之結果進行動態協商與最優化方案對齊。
+Release 19 將意圖的動態互動劃分為兩個核心階段。首先是「意圖預評估階段（Pre-evaluation Phase）」，在不變更網路實體配置的前提下，透過意圖探索（Intent Exploration）尋求最契合當前網路能力的意圖邊界；其次是「意圖履行階段（Fulfilment Phase）」，當存在多個可行部署路徑且各具技術利弊時，允許 Producer 與 Consumer 針對可達成之結果進行動態協商與最優化方案對齊。
 
 \textbf{2. 意圖效益函數（Intent Utility Function）} \\
 為了解決傳統「滿意／不滿意」二元化判定在面對複雜權衡（Trade-offs）時的無力感，Release 19 首次引入了數學化的「意圖效益函數」（Intent Utility Function）。該函數由變數（Variables）、權重（Weights）與數學映射公式（Function）構成，最終輸出一個介於 $[0, 100]$ 的滿意度指標（Satisfaction Level）。透過效益函數，Consumer 得以定量定義不同指標的相對重要性（例如：低延遲的權重高於高吞吐量），使 Producer 得以依此計算出多意圖架構下的全局最優解（Quantitative Fulfilment）。
 
 \textbf{3. 意圖處理狀態機管理（Intent Handling State Management）} \\
-Release 19 確立了更為嚴謹的狀態轉移矩陣，用以精確追蹤意圖在全生命週期中的運行狀態。系統定義了包含已確認（\texttt{ACKNOWLEDGED}）、合規且執行中（\texttt{COMPLIANT}）、已達成（\texttt{FULFILLED}）、暫停（\texttt{SUSPENDED}）、效能降級（\texttt{DEGRADED}）以及履行失敗（\texttt{FULFILLMENT\_FAILED}）等明確狀態。其中「效能降級」狀態的引入，使系統能精確捕捉到意圖曾被成功履行、但在持續閉環觀測期中因外在環境變動而不再滿足 SLA 的動態邊界，為網絡的彈性自癒提供了標準化的狀態基石。
+Release 19 確立了更為嚴謹的狀態轉移矩陣，用以精確追蹤意圖在全生命週期中的運行狀態。系統定義了包含已確認（\texttt{ACKNOWLEDGED}）、合規且執行中（\texttt{COMPLIANT}）、已達成（\texttt{FULFILLED}）、暫停（\texttt{SUSPENDED}）、效能降級（\texttt{DEGRADED}）以及履行失敗（\texttt{FULFILLMENT\_FAILED}）等明確狀態。其中「效能降級」狀態的引入，使系統能精確捕捉到意圖曾被成功履行、但在持續閉環觀測期中因外在環境變動而不再滿足 SLA 的動態邊界，為網路的彈性自癒提供了標準化的狀態基石。
 
 \subsubsection{未來發展趨勢小結}
 
