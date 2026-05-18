@@ -83,10 +83,10 @@
 \subsection{實驗一：實體環境下之跨網域 QoS 驗證}
 \label{subsec:local_qos_verification}
 
-本實驗旨在建立未經雲原生編排框架介入時之網絡效能基準，透過在 Ubuntu 實體主機上直接部署 srsRAN 與 free5GC，驗證 5G 協議棧在無線存取網端實施資源隔離的可行性。本實驗不涉及 Kubernetes 資源調度與意圖轉譯流程，僅作為後續自動化編排之效能對照組。
+本實驗旨在建立未經雲原生編排框架介入時之網路效能基準，透過在 Ubuntu 實體主機上直接部署 srsRAN 與 free5GC，驗證 5G 協議棧在無線存取網端實施資源隔離的可行性。本實驗不涉及 Kubernetes 資源調度與意圖轉譯流程，僅作為後續自動化編排之效能對照組。
 
 \subsubsection{實驗設計與環境配置}
-本實驗註冊兩組用戶設備（UE），其 IMSI 與切片對應關係如表 \ref{tab:ue_slice_mapping} 所示。在 QoS 參數設定上，eMBB 切片採用 5QI 9（Non-GBR），而 URLLC 切片則配置為 5QI 82（Delay Critical GBR）。
+本實驗註冊兩組用戶設備（UE），其 IMSI 與切片對應關係如\ref{subsec:multi_slice_ue_config}中表 \ref{tab:ue_slice_mapping} 所示。在 QoS 參數設定上，eMBB 切片採用 5QI 9（Non-GBR），而 URLLC 切片則配置為 5QI 82（Delay Critical GBR）。
 
 清單 \ref{lst:local_du_config} 展示了本實驗所採用之雙切片排程參數。
 
@@ -113,8 +113,8 @@ slicing:
 本實驗利用 \texttt{iperf3} 工具模擬真實業務負載。為排除外網延遲干擾，測試流量於本機建立之 \texttt{dummy interface} 上運行，並透過網路命名空間（Network Namespace）與 \texttt{bind-dev} 技術強制流量進入 UE 之隧道介面。測試流程定義如下：
 
 \begin{enumerate}
-    \item \textbf{階段一 (0--15s)}：啟動 eMBB 流量測試（UE1），設定為 5 Mbps 之 UDP 負載。
-    \item \textbf{階段二 (15--45s)}：於第 15 秒加入 URLLC 流量測試（UE2），設定為 1 Mbps 之 UDP 負載，模擬異質切片競爭無線資源之情境。
+    \item \textbf{階段一 (0--15s)}：啟動 eMBB 流量測試（UE1），設定為 3 Mbps 之 UDP 負載。
+    \item \textbf{階段二 (15--45s)}：於第 15 秒加入 URLLC 流量測試（UE2），設定為 3 Mbps 之 UDP 負載，模擬異質切片競爭無線資源之情境。
     \item \textbf{階段三 (45--60s)}：於第 45 秒停止 URLLC 流量，觀察 eMBB 業務之恢復情形。
 \end{enumerate}
 
@@ -206,7 +206,7 @@ expert_execution:
 實驗數據顯示，端到端總時延（$T_{total}$）之中位數落在 32 秒左右。分析各階段耗時如下：
 \begin{itemize}
     \item \textbf{NSMF 轉譯與發布 ($T_1 - T_0$)}：平均耗時約 7.35 秒。此階段包含 E2E Orchestrator 進行意圖解析與對應之 Nephio Porch 套件審批流程。
-    \item \textbf{GitOps 狀態同步 ($T_2 - T_1$)}：平均耗時約 22.66 秒。此為全流程之主要時延來源，係因 ConfigSync 受限於 Git 倉庫之輪詢週期與網絡同步開銷。
+    \item \textbf{GitOps 狀態同步 ($T_2 - T_1$)}：平均耗時約 22.66 秒。此為全流程之主要時延來源，係因 ConfigSync 受限於 Git 倉庫之輪詢週期與網路同步開銷。
     \item \textbf{NSSMF 實體化配置 ($T_3 - T_2$)}：平均耗時僅約 0.06 秒。實驗證實本研究開發之 \texttt{srsran-operator} 能在監聽到資源變更後，近乎即時地生成實體網元組態檔。
 \end{itemize}
 
@@ -245,4 +245,4 @@ expert_execution:
 \section{本章總結}
 \label{sec:chapter_summary}
 
-本章透過三項關鍵實驗完整驗證了本研究所提之架構。實驗一確立了實體環境下之資源隔離基準；實驗二證明了 Nephio 雲原生編排能達成與實體環境一致之隔離效能；實驗三則量化了編排時延，並透過閉環機制確認了配置之最終一致性。實驗結果顯示，本系統能有效將抽象業務期望轉化為實體網絡保障，同時大幅降低了跨網域切片之管理門檻。
+本章透過三項關鍵實驗完整驗證了本研究所提之架構。實驗一確立了實體環境下之資源隔離基準；實驗二證明了 Nephio 雲原生編排能達成與實體環境一致之隔離效能；實驗三則量化了編排時延，並透過閉環機制確認了配置之最終一致性。實驗結果顯示，本系統能有效將抽象業務期望轉化為實體網路保障，同時大幅降低了跨網域切片之管理門檻。
