@@ -233,7 +233,7 @@ expert_execution:
 依據 3GPP TS 28.312 規格，本研究驗證了 \texttt{E2EQoSIntent} 資源之 \texttt{status} 子資源。如清單 \ref{lst:intent_status} 所示，腳本確認了以下關鍵指標：
 \begin{itemize}
     \item \textbf{Fulfillment State}：驗證其標記為 \texttt{FULFILLED}，代表跨網域轉譯與派發指令均已正確執行。
-    \item \textbf{Observed Generation}：驗證編排器所觀察到之世代（Generation）與意圖模型之元數據一致，確保無配置漂移或處理遺漏。
+    \item \textbf{Observed Generation}：驗證編排器所觀察到之世代（Generation）與意圖模型之元數據（Metadata）一致，確保無配置漂移或處理遺漏。
     \item \textbf{Domain Specific Status}：確認 RAN 網域與 Core 網域之狀態分別處於 \texttt{CONFIGURED}，且包含對應之 5QI 與切片識別碼資訊。
 \end{itemize}
 
