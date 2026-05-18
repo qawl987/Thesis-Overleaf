@@ -28,10 +28,13 @@
 
 \normalsize 
   
-Write your abstract here. Through computer vision technologies, ...
+Network slicing is vital for guaranteeing diverse Quality of Service in 5G and emerging 6G networks. However, conventional cross-domain end-to-end slice orchestration relies on imperative interfaces, suffering from cumbersome configurations and coordination latency. To address these challenges, this study designs and implements an E2E intent-driven slice orchestration system compliant with 3GPP and ETSI Service-Based Management Architecture specifications. Based on the declarative Kubernetes Resource Model, the northbound Intent Management MnS Interface leverages Custom Resources to hide low-level technical complexities from external consumers, establishing an outcome-oriented paradigm for automated operations.
 
+The proposed E2E Orchestrator acts as the Network Slice Management Function and Intent Handler. Southbound, a dual-track mechanism manages heterogeneous sub-domains: the Radio Access Network domain integrates the Nephio platform for automated package lifecycle management, while the core network domain employs a hybrid orchestration path to dynamically inject translated parameters into the core context. Additionally, custom Operators deployed in workload clusters serve as the Network Slice Subnet Management Function, executing recursive reconciliation and physical configuration of local resources.
+
+E2E testbed evaluation demonstrates that the system accurately translates high-level Service Level Agreement expectations into underlying radio resource and core network policies, effectively guaranteeing data-plane QoS under resource contention. Furthermore, the status feedback mechanism enables eventual consistency and self-healing. This system provides a practical open-source reference architecture for the evolution toward Zero-touch Management in future mobile networks.
 
 \vspace{1cm}
 
 % 5-7 Keywords (English) 
-\textbf{Keywords: English, keywords, five to seven, computer vision, IoT.} 
+\textbf{Keywords: 5G, Intent-Driven Management, Network Slicing, Nephio, OCUDU} 
