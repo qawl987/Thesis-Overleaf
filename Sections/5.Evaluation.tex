@@ -1,32 +1,10 @@
-\chapter{Performance Evaluation}
-\label{ch:evaluation2}
+\chapter{未來研究方向}
+\label{sec:future_work}
 
-In this section, 整理效能評估.
+本研究成功設計並實作了一套基於 3GPP 與 ETSI 服務化管理架構（SBMA）的意圖驅動端到端網路切片編排系統，並透過 Kubernetes Operator 與 Nephio 宣告式自動化管線，驗證了高階 SLA 意圖轉譯至底層無線存取網實體資源塊比率（PRB Ratio）與核心網 5QI 映射之資源隔離有效性。然而，若要將此架構推向完全自治網路（Autonomous Networks）與無人干預管理（Zero-touch Management）的願景，仍有數個關鍵的技術維度與標準化機制有待進一步深入探討與擴充。
 
-下面是subfigure的範例 (其實我個人不常用這個語法, 我都直接在繪圖工具上把圖片整合在一起 XD)
+首先，在南向用戶面（Data Plane）的資源調度能力上，本實驗平台目前受限於開源核心網 free5GC 之底層實作限制，其核心網用戶面功能（UPF）之核心核心模組（gtp5g）尚未具備完善的動態多品質服務（QoS）串流優先級調度與頻寬保障機制。這使得端到端切片的隔離機制呈現實質上的不對稱性，亦即無線存取網端具備高度動態的 PRB 資源劃分與排程優先權調配能力，而核心網端則主要依賴靜態合約訂閱資料之最大位元速率（MBR）進行粗粒度的流量限制，無法針對突發性的臨界流量提供即時的 QoS 保障。因此，未來的研究方向將聚焦於深入 Linux 內核空間擴充核心網 UPF 之封包處理架構，引入類似 Linux 流量控制（Traffic Control）或權重公平佇列（WFQ）之演算法。使其能真正遵循 3GPP 規格中所定義的保證位元速率（GBR）與動態數據流優先級，在核心網端落實多佇列之硬性頻寬隔離與極低延遲調度，達成雙向且全網域對稱之端到端服務品質保障。
 
-\begin{figure}
-     \centering
-     \begin{subfigure}[]{0.3\textwidth}
-         \centering
-         \includegraphics[width=\textwidth]{img/fig1.png}
-         \caption{figure 1}
-         \label{fig:11111}
-     \end{subfigure}
-     \hfill
-     \begin{subfigure}[]{0.3\textwidth}
-         \centering
-         \includegraphics[width=\textwidth]{img/fig2.png}
-         \caption{figure 2}
-         \label{fig:22222}
-     \end{subfigure}
-     \hfill
-     \begin{subfigure}[]{0.3\textwidth}
-         \centering
-         \includegraphics[width=\textwidth]{img/fig3.png}
-         \caption{figure 3}
-         \label{fig:33333}
-     \end{subfigure}
-        \caption{Three simple graphs}
-        \label{fig:three graphs}
-\end{figure}
+其次，在北向管理面（Management Plane）的意圖治理維度上，本系統目前主要著眼於單一 MnS Consumer 下發意圖後之轉譯與閉環達成狀態回饋（Fulfillment State），尚未建構出一套完整的意圖生命週期治理平台。依據 3GPP SA5 工作組在 Release 18 與 Release 19 最新規範之演進趨勢，當多個不同的意圖擁有者（如多個垂直產業租戶）同時下發相異的切片服務期望，或網路底層實體資源面臨嚴重競爭時，系統極易陷入多層級意圖衝突與資源奪取的困境。未來的研究方向將致力於意圖編排器（E2E Orchestrator）之北向介面引入「意圖准入控制器（Intent Admission Controller）」，並實作 3GPP 標準化之意圖達成可行性檢查（Intent Fulfilment Feasibility Check）與多層級衝突管理機制。透過引入基於搶佔（Pre-emption）與優先權策略裁決的標準化衝突解決程序，系統將具備自主與 Consumer 進行雙向自動化協商的能力。
+
+最後，目前 MnS Consumer 仍須透過結構化之 KRM 自定義資源（E2EQoSIntent）宣告列舉型之 SLA 指標，尚未達成完全自然語言之互動。未來的研究方向規劃於系統前端整合大語言模型（LLM）與生成式人工智慧（GenAI）技術，打造全天然介面之北向意圖提取引擎，將營運商或垂直產業租戶之高階語意指令自動化重塑為結構化之宣告式資源。在此基礎上，亦將結合 3GPP Release 19 最新引入的數學化「意圖效益函數（Intent Utility Function）」概念，透過定義變數、權重與非線性映射公式，將租戶對於低延遲、高吞吐量或低能耗之差別化滿意度進行精確定量化。透過將此效益函數帶入 Kubebuilder 之調和迴圈（Reconciliation Loop），系統將得以在複雜的多指標權衡（Trade-offs）中，以數學精確計算出全網資源配置之全域最優解（Quantitative Fulfilment），從而真正落實未來 6G 自治網路無人干預且具備高經濟效益之自主運維願景。
