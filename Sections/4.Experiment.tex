@@ -51,7 +51,7 @@
 為量化驗證意圖驅動編排系統在資源隔離與自動化流程中之效能，本研究定義了以下兩大類評估指標。第一類針對網路切片之數據面（Data Plane）服務品質保障，第二類則針對管理面（Management Plane）之編排效率。
 
 \subsubsection{數據面服務品質指標 (Data Plane QoS Metrics)}
-本研究利用 \texttt{iperf3} 工具產生 UDP 流量，模擬異質業務負載 。透過在用戶設備端之容器命名空間內進行量測，定義以下三項關鍵指標：
+本研究利用 \texttt{iperf3} 工具產生 UDP 流量，模擬異質業務負載。該工具可於測試端輸出吞吐量、抖動與封包遺失等統計資訊，適合用於本研究之切片服務品質量測 \cite{iperf3_manual}。透過在用戶設備端之容器命名空間內進行量測，定義以下三項關鍵指標：
 \begin{itemize}
     \item \textbf{吞吐量 (Throughput)}：單位時間內成功傳輸之有效位元速率（Bitrate）。
     \item \textbf{封包遺失率 (Packet Loss Rate)}：未成功抵達接收端之數據包占總發送包之比例。此指標為衡量資源隔離有效性之核心，當 eMBB 與 URLLC 產生資源競爭時，系統應優先保障 URLLC 之低遺失率要求 。
@@ -69,12 +69,12 @@
 其中各分項定義如下：
 \begin{itemize}
     \item \textbf{編排與轉譯時延 ($T_{orchestration}$)}：定義為從 \texttt{E2EQoSIntent} 套用（$T_0$）至 Nephio Porch 完成套件修改與發佈（$T_1$）之時間。此階段反映了 E2E Orchestrator 之轉譯引擎效率。
-    \item \textbf{狀態同步時延 ($T_{sync}$)}：定義為從 Porch 完成發佈（$T_1$）至工作負載叢集之 ConfigSync 完成 Git 資源拉取（$T_2$）之時間。此階段受限於 GitOps 之輪詢週期。
+    \item \textbf{狀態同步時延 ($T_{sync}$)}：定義為從 Porch 完成發佈（$T_1$）至工作負載叢集之 ConfigSync 完成 Git 資源拉取（$T_2$）之時間。此階段受限於 GitOps 之輪詢週期與 ConfigSync 同步機制 \cite{google_config_sync,cncf_gitops_2025}。
     \item \textbf{領域調和時延 ($T_{operator}$)}：定義為 \texttt{srsran-operator} 監聽到資源變更並生成最終實體 \texttt{ConfigMap}（$T_3$）之耗時。此指標反映了本研究開發之 NSSMF 邏輯執行效率。
 \end{itemize}
 
 \subsubsection{意圖達成狀態指標 (Intent Fulfillment Metrics)}
-除了量化指標外，本研究亦根據 3GPP TS 28.312 定義之達成狀態（Fulfillment State）作為定性分析依據 。系統會透過 CRD 的 \texttt{status} 欄位回饋 \texttt{FULFILLED} 或 \texttt{NOT\_FULFILLED} 標籤，用以判定網域特定參數（如 5QI 與 PRB Ratio）是否已正確實體化於目標環境中。
+除了量化指標外，本研究亦根據 3GPP TS 28.312 定義之達成狀態（Fulfillment State）作為定性分析依據。系統會透過 CRD 的 \texttt{status} 欄位回饋 \texttt{FULFILLED} 或 \texttt{NOT\_FULFILLED} 標籤，用以判定網域特定參數（如 5QI 與 PRB Ratio）是否已正確實體化於目標環境中。
 
 \section{端到端切片效能隔離驗證}
 \label{sec:slice_performance}
@@ -110,7 +110,7 @@ slicing:
 \end{lstlisting}
 
 \subsubsection{測試程序與流量模型}
-本實驗利用 \texttt{iperf3} 工具模擬真實業務負載。為排除外網延遲干擾，測試流量於本機建立之 \texttt{dummy interface} 上運行，並透過網路命名空間（Network Namespace）與 \texttt{bind-dev} 技術強制流量進入 UE 之隧道介面。測試流程定義如下：
+本實驗利用 \texttt{iperf3} 工具模擬真實業務負載，並透過 UDP 模式產生固定速率之競爭流量。為排除外網延遲干擾，測試流量於本機建立之 \texttt{dummy interface} 上運行，並透過網路命名空間（Network Namespace）與 \texttt{bind-dev} 技術強制流量進入 UE 之隧道介面。測試流程定義如下：
 
 \begin{enumerate}
     \item \textbf{階段一 (0--15s)}：啟動 eMBB 流量測試（UE1），設定為 3 Mbps 之 UDP 負載。
@@ -156,7 +156,7 @@ expert_execution:
 實驗結果如圖 \ref{fig:k8s_urllc_vs_embb} 所示。整體效能走勢與實體環境實驗（實驗一）展現高度一致性：
 \begin{itemize}
     \item \textbf{資源競爭行為}：在第 15 秒加入 URLLC 流量後，系統能精確落實由 Nephio 編排之 PRB 優先級政策。數據顯示 URLLC 流量能穩定維持在約 1.42 Mbits/sec 的傳輸速率，而 eMBB 則因資源被奪取而導致吞吐量大幅下降至約 215 Kbits/sec，且伴隨明顯之延遲抖動上升。
-    \item \textbf{虛擬化損耗評估}：受限於 VM 與 Kubernetes 網路層（Multus/CNI）之封裝開銷，本實驗之最大可用吞吐量設定為 1.5 Mbps，較實體機之 3 Mbps 為低。這證實了在雲原生環境下，雖然資源隔離邏輯（PRB/Priority）能正確實施，但底層虛擬化與 CISM 平台之介入確實會引入額外之處理成本。
+    \item \textbf{虛擬化損耗評估}：受限於 VM 與 Kubernetes 網路層（Multus/CNI）之封裝開銷，本實驗之最大可用吞吐量設定為 1.5 Mbps，較實體機之 3 Mbps 為低。由於 Multus 會為 Pod 掛載額外網路介面以承載不同邏輯鏈路，此多介面封裝雖能滿足電信網元之隔離需求，但也會增加容器網路處理路徑之複雜度 \cite{multus_cni}。這證實了在雲原生環境下，雖然資源隔離邏輯（PRB/Priority）能正確實施，但底層虛擬化與 CISM 平台之介入確實會引入額外之處理成本。
     \item \textbf{隔離有效性確認}：儘管絕對流量值受限，但在 45 秒 URLLC 流量結束後，eMBB 之吞吐量隨即恢復至 1.5 Mbps 以上之水準，證明本研究開發之二層編排架構能確保宣告式意圖在動態變化的容器環境中仍能維持最終一致性之資源保障。
 \end{itemize}
 
@@ -206,7 +206,7 @@ expert_execution:
 實驗數據顯示，端到端總時延（$T_{total}$）之中位數落在 32 秒左右。分析各階段耗時如下：
 \begin{itemize}
     \item \textbf{NSMF 轉譯與發布 ($T_1 - T_0$)}：平均耗時約 7.35 秒。此階段包含 E2E Orchestrator 進行意圖解析與對應之 Nephio Porch 套件審批流程。
-    \item \textbf{GitOps 狀態同步 ($T_2 - T_1$)}：平均耗時約 22.66 秒。此為全流程之主要時延來源，係因 ConfigSync 受限於 Git 倉庫之輪詢週期與網路同步開銷。
+    \item \textbf{GitOps 狀態同步 ($T_2 - T_1$)}：平均耗時約 22.66 秒。此為全流程之主要時延來源，係因 ConfigSync 需從 Git 倉庫拉取並套用宣告式資源，其同步週期與網路開銷會直接影響端到端編排時延 \cite{google_config_sync}。
     \item \textbf{NSSMF 實體化配置 ($T_3 - T_2$)}：平均耗時僅約 0.06 秒。實驗證實本研究開發之 \texttt{srsran-operator} 能在監聽到資源變更後，近乎即時地生成實體網元組態檔。
 \end{itemize}
 

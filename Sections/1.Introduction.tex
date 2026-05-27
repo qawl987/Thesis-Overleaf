@@ -8,9 +8,9 @@
 
 傳統的網路管理方式高度依賴人工介入與靜態配置，維運人員需要深入理解底層設備的廠商專屬介面，方能完成核心網(Core Network)與無線接取網(Radio Access Network, RAN)的協調配置。這種方式不僅耗時，更難以因應 6G 所要求的動態服務等級協議(Service Level Agreement, SLA)調整。以具體場景為例，當一組工業無人機的控制訊號需要從 eMBB 切片臨時升級至 URLLC 切片，以滿足更嚴苛的封包延遲預算(Packet Delay Budget, PDB)時，傳統流程往往耗時數分鐘乃至數十分鐘，遠超實際應用所能容忍的上限。
 
-為回應上述挑戰，3GPP TS 28.312 規格提出了意圖驅動管理(Intent-driven Management)框架，允許上層應用程式（rApp）以高階、聲明式的語意描述網路期望狀態，而無需關心底層實現細節。然而，此類標準框架的落地實踐，尤其是在涵蓋 RAN 與 Core 的完整端到端閉環控制上，目前仍缺乏足夠具體的開源參考實作。
+為回應上述挑戰，3GPP TS 28.312 規格提出了意圖驅動管理(Intent-driven Management)框架，允許上層應用程式（rApp）以高階、聲明式的語意描述網路期望狀態，而無需關心底層實現細節 \cite{3gpp_ts28312}。另一方面，O-RAN 架構亦強調 RAN 功能拆分與開放介面，為上層應用程式介入無線存取網管理提供了更具彈性的參照模型 \cite{oran_oad_r005}。然而，此類標準框架的落地實踐，尤其是在涵蓋 RAN 與 Core 的完整端到端閉環控制上，目前仍缺乏足夠具體的開源參考實作。
 
-與此同時，雲原生技術正與電信領域深度融合。Nephio 專案以 Kubernetes 資源模型(Kubernetes Resource Model, KRM)為基礎，透過聲明式 GitOps 工作流程管理網路功能的部署與配置，提供了一套有別於傳統運維支援系統(Operations Support System, OSS)的新型電信自動化平台。Nephio 的 Porch 套件管理系統允許對設備配置進行版本控制、審查與差異化部署，從而將電信網路的配置管理與軟體開發的持續整合實踐相結合。
+與此同時，雲原生技術正與電信領域深度融合。Nephio 專案以 Kubernetes 資源模型(Kubernetes Resource Model, KRM)為基礎，透過聲明式 GitOps 工作流程管理網路功能的部署與配置，提供了一套有別於傳統運維支援系統(Operations Support System, OSS)的新型電信自動化平台。GitOps 強調以版本化儲存庫作為期望狀態之來源，並由自動化控制迴圈將狀態同步至目標環境 \cite{cncf_gitops_2025}。Nephio 的 Porch 套件管理系統允許對設備配置進行版本控制、審查與差異化部署，從而將電信網路的配置管理與軟體開發的持續整合實踐相結合。
 
 \section{研究動機}
 
@@ -22,7 +22,7 @@
 
 \section{研究目標與主要貢獻}
 
-針對前述研究動機，本研究之首要目標為開發一套遵循 3GPP TS 28.312 規格的雲原生端到端意圖編排系統。本研究透過 Kubernetes Operator 模式實作宣告式 R1 介面，藉由設計 E2E Intent Orchestrator 核心組件，將抽象的 SLA 需求轉化為可執行的領域配置指令。此系統之建構旨在達成從意圖提交、參數轉譯到無線電資源生效的完整自動化管道。
+針對前述研究動機，本研究之首要目標為開發一套遵循 3GPP TS 28.312 規格的雲原生端到端意圖編排系統。本研究透過 Kubernetes Operator 模式實作宣告式 R1 介面，藉由設計 E2E Intent Orchestrator 核心組件，將抽象的 SLA 需求轉化為可執行的領域配置指令。Operator 模式以控制器持續觀測自定義資源並調和實際狀態，適合作為此類閉環管理邏輯之實作基礎 \cite{kubernetes_operator_pattern,kubernetes_controller}。此系統之建構旨在達成從意圖提交、參數轉譯到無線電資源生效的完整自動化管道。
 
 為支撐上述架構，本研究在技術實作與系統整合方面達成以下貢獻。首先，本研究開發了專為 Nephio 體系設計的 srsran-operator，使 srsRAN 網路功能得以整合至雲原生編排流程，並達成與 free5GC 的自動化連接。其次，本研究實作了 srsran-helm 部署方案，將 srsue 封裝為符合雲原生規格的應用組件。此工作將原本獨立運行的模擬工具轉化為可受 Kubernetes 調度的標準化資源，為端到端意圖驅動系統提供了一個可自動化執行且易於擴展的測試平台。
 

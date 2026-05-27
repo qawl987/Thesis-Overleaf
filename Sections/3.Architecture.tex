@@ -13,13 +13,13 @@
 \end{figure}
 
 \begin{enumerate}
-    \item \textbf{服務消費者層（Service Consumer Layer）}：對應架構圖中 Layer 1 之 Service Consumer Domain。此層級為管理需求之發起者，扮演 \textbf{MnS Consumer} 之角色。消費者透過 \textbf{Kubernetes API Server} 提供的 \textbf{Intent Management MnS Interface}，下發宣告式之 \texttt{E2EQoSIntent} 自定義資源。使用者僅需根據業務需求定義高階期望指標，例如頻寬期望（\texttt{bandwidth: "high"}）、延遲期望（\texttt{latency: "ultra-low"}）或資源共享策略（\texttt{resourceShare: "Full"}），無需介入底層網域之特定技術配置。
+    \item \textbf{服務消費者層（Service Consumer Layer）}：對應架構圖中 Layer 1 之 Service Consumer Domain。此層級為管理需求之發起者，扮演 \textbf{MnS Consumer} 之角色。消費者透過 \textbf{Kubernetes API Server} 提供的 \textbf{Intent Management MnS Interface}，下發宣告式之 \texttt{E2EQoSIntent} 自定義資源。此設計利用 Kubernetes 自定義資源機制，將電信領域之意圖模型擴展為可由 API Server 驗證、儲存與監控的原生資源 \cite{kubernetes_custom_resources}。使用者僅需根據業務需求定義高階期望指標，例如頻寬期望（\texttt{bandwidth: "high"}）、延遲期望（\texttt{latency: "ultra-low"}）或資源共享策略（\texttt{resourceShare: "Full"}），無需介入底層網域之特定技術配置。
 
     \item \textbf{意圖編排與協調層（Intent Orchestration Layer）}：對應架構圖 Layer 2 之核心組件。本層級由 \textbf{E2E Orchestrator} 構成，實質承擔 \textbf{NSMF / Intent Handler} 之職能。其負責監聽北向介面之意圖請求，並執行意圖轉譯（Intent Translation），將抽象 SLA 期望精確映射為網域特定參數（如 Core 網域之 5QI 與 RAN 網域之 PRB 比例）。
 
     \item \textbf{供應與南向介面層（Southbound Interface Layer）}：同樣位於 Layer 2 之管理叢集內，負責執行跨網域之編排指令下發。針對 RAN 網域，本系統整合 \textbf{Nephio Porch} 與 \textbf{Kpt Pipeline}，透過 \textbf{Git Repo} 實施配置套件之變更與發布；針對 Core 網域，則透過封裝之 \textbf{REST Client} 執行混合式編排，直接與核心網管理介面進行通訊。
 
-    \item \textbf{網域執行與實施層（Domain Execution Layer）}：對應架構圖 Layer 3 之 NSSMF Domain。此層級負責將編排結果落實於實體網路環境，包含負責無線存取網網域調和之 \textbf{srsran-operator} 與負責核心網網域調和之 \textbf{free5gc-operator}。各 Operator 透過 \textbf{ConfigSync} 監聽期望狀態，並驅動實體網元（如 srsRAN 之 CU/DU 與 free5GC 之各個 NF）執行資源隔離與 QoS 配置。
+    \item \textbf{網域執行與實施層（Domain Execution Layer）}：對應架構圖 Layer 3 之 NSSMF Domain。此層級負責將編排結果落實於實體網路環境，包含負責無線存取網網域調和之 \textbf{srsran-operator} 與負責核心網網域調和之 \textbf{free5gc-operator}。各 Operator 透過 \textbf{ConfigSync} 監聽期望狀態，並驅動實體網元（如 srsRAN 之 CU/DU 與 free5GC 之各個 NF）執行資源隔離與 QoS 配置。此層級的調和邏輯對應 Kubernetes Operator 模式所強調的領域知識自動化封裝 \cite{kubernetes_operator_pattern}。
 \end{enumerate}
 
 \subsection{意圖驅動工作流：從 SLA 期望到實體佈署之參數演化}
@@ -184,7 +184,7 @@ data:
     \item \textbf{建立草稿與提取 (Copy \& Pull)}：編排器首先以基礎藍圖（Blueprint）為範本，透過 \texttt{copy} 指令複製出一個全新的套件修訂版（PackageRevision）草稿，並將其拉取（Pull）至記憶體中進行處理。
     \item \textbf{意圖參數注入 (Mutate)}：編排器解析套件內的 \texttt{srscellconfig.yaml} 等資源檔，針對 \texttt{spec.slicing} 陣列進行精準替換。同時，視意圖需求動態修改 \texttt{PLMNConfig}，注入對應的切片識別碼（SST/SD），而未涉及切片的實體層參數則原封不動予以保留。
     \item \textbf{版本推播與提議 (Push \& Propose)}：完成參數替換後，編排器將變更後的套件推播（Push）回 Porch，並將套件狀態推進至 \texttt{Propose}，代表該配置已準備好接受審查。
-    \item \textbf{批准發佈 (Approve)}：最終，編排器觸發 \texttt{Approve} 操作，正式發佈該套件。此動作將觸發底層 CISM (Cluster Infrastructure \& Service Management) 代理程式（如 ConfigSync）的同步機制，將配置派發至目標工作負載叢集。
+    \item \textbf{批准發佈 (Approve)}：最終，編排器觸發 \texttt{Approve} 操作，正式發佈該套件。此動作將觸發底層 CISM (Cluster Infrastructure \& Service Management) 代理程式（如 ConfigSync）的同步機制，將配置派發至目標工作負載叢集。由於 ConfigSync 會持續將 Git 中的 KRM 資源同步至叢集，此步驟也構成管理叢集與工作負載叢集間的狀態傳遞邊界 \cite{google_config_sync}。
 \end{enumerate}
 
 \subsubsection{宣告式編排之特性}
@@ -287,8 +287,8 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
 
 \begin{itemize}
     \item \textbf{管理叢集編排 (Management Plane)}：編排器（NSMF）透過 \textit{Nephio Porch} 操控藍圖套件（Blueprint Package）。利用 \texttt{PackageVariantSet} 機制，將針對特定工作負載叢集客製化（Specialization）後的套件發佈至對應的 Git 儲存庫。
-    \item \textbf{單一事實來源 (Git as SSOT)}：Git 儲存庫作為存取網配置的單一事實來源。所有的意圖變更（如增加切片）最終皆會反應為 Git 上的 YAML 修訂版本。
-    \item \textbf{狀態同步 (ConfigSync)}：部署於工作負載叢集的 \textit{ConfigSync} 代理程式會持續拉取 Git 變更，並將 \texttt{NFDeployment} 與相關的 \texttt{Config} 資源套用（Apply）至叢集中。
+    \item \textbf{單一事實來源 (Git as SSOT)}：Git 儲存庫作為存取網配置的單一事實來源。所有的意圖變更（如增加切片）最終皆會反應為 Git 上的 YAML 修訂版本。此作法符合 GitOps 對版本化、可追溯與可審查配置來源之要求 \cite{cncf_gitops_2025}。
+    \item \textbf{狀態同步 (ConfigSync)}：部署於工作負載叢集的 \textit{ConfigSync} 代理程式會持續拉取 Git 變更，並將 \texttt{NFDeployment} 與相關的 \texttt{Config} 資源套用（Apply）至叢集中 \cite{google_config_sync}。
     \item \textbf{本地實體化 (Local Execution)}：一旦 \texttt{NFDeployment} 資源出現在工作負載叢集內，\texttt{srsran-operator} 隨即捕捉到此訊號，並執行前述之遞迴查找，最終生成 CU-CP、CU-UP 與 DU 的 \texttt{Deployment} 與 \texttt{ConfigMap}，完成從雲端編排到邊緣實施的自動化閉環。
 \end{itemize}
 
@@ -312,7 +312,7 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
 \subsubsection{多介面容器設計與邏輯隔離}
 在 3GPP 標準架構中，控制面（Control Plane）與用戶面（User Plane）的物理或邏輯隔離是確保電信網路安全與效能的關鍵。傳統 Kubernetes Pod 通常僅具備單一網路介面（\texttt{eth0}），難以模擬 5G 網元複雜的介面需求（如 N2 控制面與 N3 用戶面的分離）。
 
-本系統透過 \textit{Multus CNI} 為 \textit{srsRAN} 組件實作了多介面容器設計。藉由 \textit{NetworkAttachmentDefinition} 資源，每個網元 Pod 能夠掛載多個專屬的次要介面（Secondary Interfaces），分別承載 N2、N3、E1 與 F1 等不同性質的流量，達成邏輯上的徹底隔離。
+本系統透過 \textit{Multus CNI} 為 \textit{srsRAN} 組件實作了多介面容器設計。Multus 作為 Kubernetes 的 CNI 外掛，允許 Pod 除預設介面外再掛載多個網路介面，適合用於電信網元需要多參考點連接的場景 \cite{multus_cni}。藉由 \textit{NetworkAttachmentDefinition} 資源，每個網元 Pod 能夠掛載多個專屬的次要介面（Secondary Interfaces），分別承載 N2、N3、E1 與 F1 等不同性質的流量，達成邏輯上的徹底隔離。
 
 \subsubsection{邏輯拓樸與 IP 分配策略}
 本系統的 IP 分配並非手動設定，而是由 \texttt{srsran-operator} 自動化完成。當 Operator 監聽並讀取 \texttt{NFDeployment} 中的介面請求（Interface Requests）後，會結合 \textit{Nephio IPAM} 所核發的子網段資訊，自動運算出各組件的固定偏置 IP（IP Offset），並將其注入至自動生成的 \texttt{ConfigMap} 內容中。表 \ref{tab:logical_interface_mapping} 詳細列出了實驗環境之邏輯網路介面對應關係。
@@ -363,7 +363,7 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
 
 \begin{itemize}
     \item \textbf{Nephio 自動化管道 (受測系統)}：核心網元件（free5GC）與存取網組件（srsRAN CU/DU）被視為電信基礎設施的一部分。這些組件被納入基於 \textit{Nephio} 的 \textit{workload pipeline} 中，接受 \textit{E2E Orchestrator} 的宣告式意圖管理。此設計模擬了電信營運商在生產環境中，如何透過自動化管道對網路功能（NFs）執行完整的生命週期管理與切片參數配置。
-    \item \textbf{Helm 部署層 (測試與模擬資源)}：用戶設備（srsUE）、\textit{GNU Radio Breaker}（射頻橋接器）以及 \textit{iperf3} 流量產生工具，則被歸類為測試端資源。本研究利用 \texttt{srsran-helm} 專案，透過 \textit{Helm} 方式進行獨立部署。由於 UE 等元件主要用於模擬業務行為，無需納入複雜的 \textit{Nephio} 宣告式管線，採用 \textit{Helm} 能提供更直接且靈活的配置變更能力。
+    \item \textbf{Helm 部署層 (測試與模擬資源)}：用戶設備（srsUE）、\textit{GNU Radio Breaker}（射頻橋接器）以及 \textit{iperf3} 流量產生工具，則被歸類為測試端資源。本研究利用 \texttt{srsran-helm} 專案，透過 \textit{Helm} 方式進行獨立部署。其中 \texttt{iperf3} 可產生 TCP 或 UDP 測試流量並回報吞吐量、抖動與封包遺失等指標，適合作為切片效能量測工具 \cite{iperf3_manual}。由於 UE 等元件主要用於模擬業務行為，無需納入複雜的 \textit{Nephio} 宣告式管線，採用 \textit{Helm} 能提供更直接且靈活的配置變更能力。
 \end{itemize}
 
 \subsection{基於 GNU Radio 之多用戶射頻橋接機制}
@@ -423,4 +423,4 @@ Operator 並不直接在單一資源中讀取所有參數，而是透過 KRM 的
 \subsection{端到端服務性能驗證工具鏈}
 \label{subsec:validation_toolchain}
 
-為量化驗證意圖驅動編排系統對網路切片之性能保障能力，本研究建立了一套標準化的性能驗證工具鏈。該工具鏈旨在自動化產生測試負載，並確保實驗數據在不同意圖配置下具備可重複性與嚴謹性。性能驗證之核心在於模擬真實業務負載，本系統利用 \texttt{iperf3} 工具產生受控的 UDP 流量，以模擬 eMBB 與 URLLC 的頻寬需求。由於 \textit{srsUE} 運行於獨立的容器環境中，其產生的切片流量經由核心網分發後，會導向用戶設備內的專屬虛擬網卡（\texttt{uesimtun0}）。為測得精確之端到端數據，測試程序需透過 Linux 的 \texttt{nsenter} 技術，穿透容器邊界並進入該 Pod 專屬的網路命名空間(Network Namespace)。透過在此命名空間內指定 \texttt{uesimtun0} 作為 I/O 介面，流量得以直接經由 5G 協議棧進行傳輸，從而有效排除宿主機網路環境的干擾，確保實驗數據能真實反映切片資源隔離的效果。
+為量化驗證意圖驅動編排系統對網路切片之性能保障能力，本研究建立了一套標準化的性能驗證工具鏈。該工具鏈旨在自動化產生測試負載，並確保實驗數據在不同意圖配置下具備可重複性與嚴謹性。性能驗證之核心在於模擬真實業務負載，本系統利用 \texttt{iperf3} 工具產生受控的 UDP 流量，以模擬 eMBB 與 URLLC 的頻寬需求，並量測吞吐量、抖動與封包遺失等數據面指標 \cite{iperf3_manual}。由於 \textit{srsUE} 運行於獨立的容器環境中，其產生的切片流量經由核心網分發後，會導向用戶設備內的專屬虛擬網卡（\texttt{uesimtun0}）。為測得精確之端到端數據，測試程序需透過 Linux 的 \texttt{nsenter} 技術，穿透容器邊界並進入該 Pod 專屬的網路命名空間(Network Namespace)。透過在此命名空間內指定 \texttt{uesimtun0} 作為 I/O 介面，流量得以直接經由 5G 協議棧進行傳輸，從而有效排除宿主機網路環境的干擾，確保實驗數據能真實反映切片資源隔離的效果。
