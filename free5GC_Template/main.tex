@@ -1,0 +1,97 @@
+﻿\documentclass[sigconf]{acmart}
+
+\AtBeginDocument{%
+  \providecommand\BibTeX{{Bib\TeX}}}
+
+% TODO: Replace these fields with the values provided by the forum or ACM rights form.
+\setcopyright{acmlicensed}
+\copyrightyear{2026}
+\acmYear{2026}
+\acmDOI{XXXXXXX.XXXXXXX}
+\acmConference[free5GC WF '26]{free5GC World Forum}{2026}{TBD}
+\acmISBN{978-1-4503-XXXX-X/2026/XX}
+
+\usepackage{listings}
+\usepackage{balance}
+\graphicspath{{../img/}}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  columns=fullflexible,
+  frame=single,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+\begin{document}
+
+\title[Intent-Driven Orchestration for 5G Slices]{Intent-Driven Orchestration System for 5G RAN and Core Network Slices}
+
+\author{Ting Fang Kai}
+\email{fangkaiting@example.com}
+\affiliation{%
+  \institution{National Yang Ming Chiao Tung University}
+  \city{Hsinchu}
+  \country{Taiwan}}
+
+\author{Jyh-Cheng Chen}
+\email{jcchen@example.com}
+\affiliation{%
+  \institution{National Yang Ming Chiao Tung University}
+  \city{Hsinchu}
+  \country{Taiwan}}
+
+\renewcommand{\shortauthors}{Ting and Chen}
+
+\begin{abstract}
+\input{sections/00_abstract}
+\end{abstract}
+
+\begin{CCSXML}
+<ccs2012>
+ <concept>
+  <concept_id>10003033.10003099.10003102</concept_id>
+  <concept_desc>Networks~Network management</concept_desc>
+  <concept_significance>500</concept_significance>
+ </concept>
+ <concept>
+  <concept_id>10003033.10003099.10003100</concept_id>
+  <concept_desc>Networks~Cloud computing</concept_desc>
+  <concept_significance>300</concept_significance>
+ </concept>
+ <concept>
+  <concept_id>10003033.10003099.10003104</concept_id>
+  <concept_desc>Networks~Network performance analysis</concept_desc>
+  <concept_significance>300</concept_significance>
+ </concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Networks~Network management}
+\ccsdesc[300]{Networks~Cloud computing}
+\ccsdesc[300]{Networks~Network performance analysis}
+
+\keywords{5G, network slicing, intent-driven management, free5GC, OCUDU, Nephio, Kubernetes, GitOps}
+
+\maketitle
+
+\input{sections/01_introduction}
+\input{sections/02_background}
+\input{sections/03_design}
+\input{sections/04_implementation}
+\input{sections/05_evaluation}
+\input{sections/07_conclusion}
+
+\begin{acks}
+This work was conducted in the context of open-source 5G core and RAN experimentation. The authors thank the free5GC, OCUDU, Kubernetes, and Nephio communities for maintaining the software foundations used in this study.
+\end{acks}
+
+\section*{Ethics and Privacy Statement}
+The experiments use emulated user equipment and synthetic traffic only. No human-subject data, production subscriber information, or real operator traffic is collected. The proposed automation can improve operational consistency, but incorrect intent policies could also misallocate network resources; deployments should therefore include admission control, audit logs, and operator approval for high-impact changes.
+
+\balance
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{refs}
+
+\end{document}

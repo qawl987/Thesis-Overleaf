@@ -1,0 +1,18 @@
+﻿\section{Introduction}
+\label{sec:introduction}
+
+Network slicing is a central mechanism for supporting diverse service requirements in 5G and emerging 6G systems. A slice may be optimized for enhanced mobile broadband (eMBB), ultra-reliable low-latency communication (URLLC), massive IoT, or an operator-defined service class. In practice, however, a slice is not configured at a single point. The radio access network (RAN) must allocate radio resources and scheduling priority, the core network must bind subscribers and PDU sessions to QoS flows, and the cloud-native infrastructure must deploy and update network functions. This cross-domain nature creates a persistent gap between service-level objectives and the low-level knobs exposed by individual systems.
+
+Intent-driven management addresses this gap by allowing a consumer to state the desired outcome rather than the sequence of operations required to achieve it. 3GPP TS 28.312 defines intent as an outcome-oriented management construct and discusses the lifecycle of intent handling, including translation, fulfillment, reporting, and conflict handling~\cite{3gpp_ts28312}. O-RAN similarly introduces RAN automation functions such as rApps for policy and optimization~\cite{oran_oad_r005}. Yet an open-source, end-to-end implementation that connects high-level intents to both free5GC and OCUDU remains difficult because the relevant controls live across different configuration systems, APIs, and reconciliation loops.
+
+This work builds an intent-driven orchestration system for open-source 5G network slices. The design uses Kubernetes as the intent interface and execution substrate. A consumer submits an \texttt{E2EQoSIntent} custom resource that describes slice expectations, such as \texttt{bandwidth: high}, \texttt{latency: ultra-low}, and \texttt{resourceShare: Full}. The orchestrator translates these expectations into domain parameters: 5QI and QFI for the 5G core, plus S-NSSAI, PRB policy ratios, and scheduling priority for the RAN. The translated state is then applied through a hybrid southbound path. RAN changes are handled as declarative Nephio package mutations that are synchronized to the workload cluster through GitOps. Core changes are applied through free5GC-facing configuration logic because the required subscriber and QoS data are not yet naturally represented as a complete Nephio package in the tested environment.
+
+This paper condenses a larger thesis into a 9-page ACM-style submission. We deliberately omit two implementation-heavy topics from the longer document: cloud-network topology and logical interface management with Multus/IPAM, and the GNU Radio based multi-user RF bridge. The resulting paper focuses on the research contribution most relevant to the forum: intent representation, cross-domain translation, orchestration paths, and empirical validation on free5GC and OCUDU.
+
+The contributions are:
+\begin{itemize}
+  \item We design a Kubernetes-native intent model, \texttt{E2EQoSIntent}, for describing multiple 5G slice objectives in one end-to-end resource.
+  \item We implement a translation layer from service-level expectations to concrete free5GC and OCUDU parameters, including 5QI, QFI, S-NSSAI, PRB policy ratio, and priority.
+  \item We integrate Nephio/GitOps and operator reconciliation into a RAN orchestration path while preserving a practical core-domain path for free5GC.
+  \item We evaluate the prototype with eMBB and URLLC slices and report both data-plane differentiation and management-plane orchestration latency.
+\end{itemize}

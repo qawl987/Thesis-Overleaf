@@ -1,0 +1,124 @@
+﻿\section{Evaluation}
+\label{sec:evaluation}
+
+The evaluation asks three questions:
+\begin{enumerate}
+  \item Can the system materialize an intent into consistent core and RAN slice configuration?
+  \item Does the generated RAN configuration differentiate eMBB and URLLC traffic?
+  \item Where is orchestration time spent in the management path?
+\end{enumerate}
+
+\subsection{Testbed}
+
+The testbed uses MicroK8s v1.28, Nephio R5, free5GC v4.2.1, OCUDU release 26.04, and an srsUE-based emulation environment. The management and workload clusters run in a virtualized environment with 10 vCPUs and 32 GB of memory. A separate local environment is used to validate the data-plane behavior of the generated OCUDU configuration. Traffic measurements use \texttt{iperf3} UDP flows~\cite{iperf3_manual}.
+
+\begin{table}[t]
+  \caption{Software components used in the prototype.}
+  \label{tab:software}
+  \begin{tabular}{ll}
+    \toprule
+    Component & Version \\
+    \midrule
+    Kubernetes distribution & MicroK8s v1.28 \\
+    Package orchestration & Nephio R5 \\
+    5G core & free5GC v4.2.1 \\
+    RAN & OCUDU release 26.04 \\
+    UE emulator & srsUE v25.10 \\
+    Orchestrator & Golang/Kubebuilder prototype \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Metrics}
+
+The evaluation separates data-plane and management-plane metrics. The data-plane measurements focus on throughput, packet loss, and jitter as reported by \texttt{iperf3}. These metrics are not intended to certify carrier-grade QoS; they are used to confirm whether the RAN scheduler reacts to the generated slice parameters. The management-plane measurements focus on orchestration latency and fulfillment state. This distinction is important because an intent system can correctly configure the network but still be too slow for a particular operational use case.
+
+For management-plane latency, the most relevant question is not only total time but also the distribution across stages. A long delay inside the orchestrator would suggest inefficient translation or API use. A long delay inside GitOps synchronization suggests a trade-off between auditability and actuation speed. A long delay inside the local operator would indicate domain-specific rendering or rollout overhead.
+
+\subsection{Data-Plane Slice Differentiation}
+
+The first experiment validates the generated slice configuration in a local environment. Two UEs are associated with different slices. UE1 is mapped to eMBB with 5QI 9 and a partial PRB share. UE2 is mapped to URLLC with a delay-critical 5QI and a full PRB share. The traffic pattern has three phases: only eMBB is active from 0--15 seconds, both eMBB and URLLC are active from 15--45 seconds, and only eMBB remains active from 45--60 seconds.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{4.2.1-urllc-vs-embb.png}
+  \caption{Local eMBB and URLLC traffic behavior under the generated slice scheduling configuration.}
+  \Description{A time-series plot comparing eMBB and URLLC traffic across three phases. URLLC receives higher priority while both flows are active, and eMBB recovers after URLLC stops.}
+  \label{fig:local_qos}
+\end{figure}
+
+Figure~\ref{fig:local_qos} shows that the RAN scheduler reacts to the generated PRB and priority configuration. During the overlap period, URLLC traffic obtains preferential treatment and eMBB throughput is reduced. After the URLLC flow stops, eMBB recovers. This result does not claim strict end-to-end URLLC guarantees; rather, it confirms that the intent-generated OCUDU configuration reaches the scheduler and produces the expected qualitative behavior.
+
+The local result also exposes a practical limitation of software RAN experiments. Because all components run on general-purpose hosts, buffering and CPU scheduling can affect observed loss and jitter. We therefore interpret the result as evidence of relative slice differentiation. The key observation is that the change in active slice mix leads to the expected change in traffic allocation.
+
+\subsection{Kubernetes/Nephio Deployment}
+
+The second experiment runs the orchestration path through the Kubernetes and Nephio environment. The same eMBB and URLLC intent is submitted as a CRD. The orchestrator mutates the RAN package, Config Sync applies the package to the workload cluster, and the OCUDU operator renders the final configuration.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{4.2.2-urllc-vs-embb.png}
+  \caption{Slice behavior after orchestration through the Nephio and Kubernetes workflow.}
+  \Description{A time-series plot showing that URLLC receives more throughput than eMBB during the overlap period in the Kubernetes-based testbed, though absolute throughput is lower than in the local environment.}
+  \label{fig:k8s_qos}
+\end{figure}
+
+Figure~\ref{fig:k8s_qos} shows the same differentiation trend after orchestration through the cloud-native workflow. Absolute throughput is lower than in the local test because the virtualized Kubernetes environment adds scheduling and networking overhead. Nevertheless, the generated configuration remains effective: when URLLC becomes active, it receives a larger share of available radio resources, and eMBB throughput decreases accordingly.
+
+\subsection{Fulfillment Verification}
+
+After each orchestration run, we verify fulfillment at three levels. First, the intent status must contain the translated parameters for each intent group. Second, the RAN package in the workload cluster must contain the intended S-NSSAI, PRB ratio, and priority. Third, the generated OCUDU ConfigMap must contain the corresponding scheduler configuration. Table~\ref{tab:verification} summarizes these checks.
+
+\begin{table}[t]
+  \caption{Fulfillment checks after applying the two-slice intent.}
+  \label{tab:verification}
+  \begin{tabular}{lll}
+    \toprule
+    Layer & Artifact & Expected result \\
+    \midrule
+    Intent API & \texttt{E2EQoSIntent.status} & \texttt{FULFILLED} \\
+    RAN package & \texttt{OCUDUCellConfig} & Two S-NSSAIs \\
+    RAN runtime & gNB ConfigMap & PRB/priority rendered \\
+    Core domain & UE QoS profile & 5QI/QFI configured \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+These checks are intentionally simple and reproducible. They give the operator confidence that the declarative request, package artifact, and runtime configuration are aligned. They also make it easier to localize faults: for example, if the package is correct but the ConfigMap is not, the likely issue is in the domain operator rather than the translation engine.
+
+\subsection{Management-Plane Latency}
+
+We measure orchestration latency by recording four timestamps: $T_0$, when the \texttt{E2EQoSIntent} is applied; $T_1$, when Porch package mutation and approval complete; $T_2$, when Config Sync applies the package to the workload cluster; and $T_3$, when the OCUDU operator updates the final ConfigMap. The total latency is:
+\begin{equation}
+  T_{total} = (T_1 - T_0) + (T_2 - T_1) + (T_3 - T_2).
+\end{equation}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{4.3.2-latency.png}
+  \caption{Management-plane latency distribution across orchestration stages.}
+  \Description{A latency plot showing that GitOps synchronization dominates total orchestration time, while operator reconciliation is short.}
+  \label{fig:latency}
+\end{figure}
+
+\begin{table}[t]
+  \caption{Representative orchestration latency sample.}
+  \label{tab:latency}
+  \begin{tabular}{lr}
+    \toprule
+    Stage & Time \\
+    \midrule
+    Orchestrator + Porch, $T_1 - T_0$ & 7.348 s \\
+    Config Sync, $T_2 - T_1$ & 22.659 s \\
+    OCUDU operator, $T_3 - T_2$ & 0.068 s \\
+    \midrule
+    Total, $T_{total}$ & 30.077 s \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Figure~\ref{fig:latency} and Table~\ref{tab:latency} show that total orchestration latency is about 30 seconds in the representative run. The dominant component is GitOps synchronization, not local operator reconciliation. This is an important engineering trade-off: GitOps adds auditability and rollback, but it is not a sub-second control loop. The design is therefore suitable for slice provisioning and policy updates, while fast per-packet or per-TTI adaptation should remain inside the RAN scheduler or a near-real-time control loop.
+
+\subsection{Summary of Findings}
+
+The evaluation supports three findings. First, the CRD-based intent interface is sufficient to express multiple slice objectives and preserve their translated parameters in status. Second, the generated OCUDU configuration changes traffic allocation in the expected direction for eMBB and URLLC flows. Third, the orchestration path is dominated by GitOps synchronization time. These findings suggest that the design is appropriate for provisioning and policy-level reconfiguration, but not for millisecond-scale radio adaptation.

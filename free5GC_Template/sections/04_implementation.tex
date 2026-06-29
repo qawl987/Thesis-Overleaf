@@ -1,0 +1,65 @@
+﻿\section{Implementation}
+\label{sec:implementation}
+
+The prototype is implemented in Golang with Kubebuilder. The controller watches \texttt{E2EQoSIntent} resources, computes translated parameters, invokes the RAN and core southbound paths, and updates status after the domain operations complete.
+
+\subsection{Controller Lifecycle}
+
+The controller follows the standard Kubernetes reconciliation pattern. When an \texttt{E2EQoSIntent} is created or updated, the reconciler fetches the current object, checks its generation, computes the desired translated state, and compares it with the last observed status. If the status already matches the current generation, the reconciliation ends without repeating southbound operations. Otherwise, the reconciler runs translation and domain realization and then writes a new status update.
+
+This idempotent structure is important for GitOps integration. Porch and Config Sync may introduce asynchronous delay, and the Kubernetes API may deliver repeated events for the same resource version. The orchestrator therefore treats every reconciliation as a convergence attempt rather than a one-shot command. A failed stage records a reason and is retried according to the controller runtime backoff policy.
+
+\subsection{RAN Package Mutation}
+
+For the RAN path, the orchestrator uses Nephio Porch as the package control point. The workflow has four steps. First, the orchestrator copies the blueprint package and pulls a mutable package revision. Second, it patches the structured KRM resource that represents OCUDU cell configuration. Third, it pushes and proposes the package revision. Fourth, it approves the package so that the GitOps pipeline can synchronize it to the workload cluster.
+
+Listing~\ref{lst:ran_mutation} shows the resulting RAN slice configuration. The eMBB slice uses SD \texttt{0x010203}, a maximum PRB policy ratio of 50, and priority 10. The URLLC slice uses SD \texttt{0x112233}, a maximum PRB policy ratio of 100, and priority 200.
+
+\begin{lstlisting}[caption={Mutated OCUDU slice configuration generated from intent translation.}, label={lst:ran_mutation}]
+spec:
+  slicing:
+    - sst: 1
+      sd: 66051
+      schedCfg:
+        minPrbPolicyRatio: 0
+        maxPrbPolicyRatio: 50
+        priority: 10
+    - sst: 1
+      sd: 1122867
+      schedCfg:
+        minPrbPolicyRatio: 0
+        maxPrbPolicyRatio: 100
+        priority: 200
+\end{lstlisting}
+
+After synchronization, the OCUDU operator renders the final \texttt{gnb-config.yml} and updates the gNB-related Kubernetes objects. This preserves Git as the single source of truth for RAN configuration and allows package-level review or rollback.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{2.2.3-nephio-workflow-new.png}
+  \caption{Nephio-style package workflow used by the RAN orchestration path.}
+  \Description{A package workflow from management cluster package mutation through Git synchronization to workload cluster application.}
+  \label{fig:nephio_workflow}
+\end{figure}
+
+Figure~\ref{fig:nephio_workflow} illustrates why the RAN path is modeled as package mutation rather than direct pod modification. The package revision becomes the reviewable artifact, while the workload cluster only consumes approved state. This provides a clean operational boundary: the intent controller decides what RAN policy should change, and the GitOps pipeline decides when the approved configuration reaches the target cluster.
+
+\subsection{Core-Domain Configuration}
+
+The core path configures free5GC with the QoS and slice information required by the target UEs. The relevant state includes S-NSSAI, subscriber binding, PDU session QoS, QFI, and 5QI. The prototype uses direct core-domain configuration because these parts of free5GC are not fully represented as Nephio-ready KRM packages in the testbed. This design is intentionally pragmatic: it keeps the end-to-end intent contract stable while allowing each domain to use the most reliable available southbound mechanism.
+
+The core implementation performs consistency checks before reporting success. For each target UE, it verifies that the intended S-NSSAI and QoS profile are present in the core-domain state. This does not prove that every packet will receive the desired treatment, because runtime QoS still depends on UPF and kernel behavior, but it does prove that the control-plane configuration requested by the intent is present.
+
+\subsection{Hierarchical RAN Resources}
+
+The OCUDU domain is represented with a small hierarchy of CRDs. \texttt{OCUDUConfig} captures application-level settings such as CU/DU deployment and radio-emulation parameters. \texttt{OCUDUCellConfig} captures cell-level settings, including slice-aware scheduling. \texttt{PLMNConfig} captures network identity and S-NSSAI information. Splitting the configuration this way avoids large monolithic resources and lets the operator validate each layer independently before producing the final ConfigMap.
+
+\subsection{Failure Handling}
+
+The prototype distinguishes three failure classes. Translation failures occur before any southbound operation, such as an unsupported slice type or an impossible combination of expectations. Delivery failures occur when the RAN package cannot be mutated, approved, or synchronized. Domain failures occur when the package is delivered but the local operator cannot render or apply the final configuration. These classes are written into intent status so that the consumer can tell whether the problem is semantic, pipeline-related, or domain-local.
+
+This failure taxonomy is deliberately aligned with future 3GPP intent features. Feasibility checks and conflict reports can be added before translation, while negotiation and utility functions can be added as policy modules that select among alternative translations. The current implementation is therefore a first step toward richer intent handling rather than a closed one-off script.
+
+\subsection{Scope}
+
+The longer thesis also contains detailed logical-interface management with Multus/IPAM and a GNU Radio bridge for multi-user RF emulation. These components are useful for a complete lab deployment but are not essential to the ACM paper's main claim. They are therefore excluded from this submission draft to keep the focus on intent translation and orchestration.

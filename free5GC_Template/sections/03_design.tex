@@ -1,0 +1,105 @@
+﻿\section{System Design}
+\label{sec:design}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{3.1.1-arch.png}
+  \caption{Intent-driven orchestration architecture for coordinating service-level slice intents with RAN and core-domain configuration.}
+  \Description{A layered architecture with service consumer, E2E orchestrator, southbound interfaces, and domain execution components for OCUDU, free5GC, Nephio, GitOps, and Kubernetes operators.}
+  \label{fig:system_arch}
+\end{figure}
+
+Figure~\ref{fig:system_arch} shows the proposed architecture. The system is divided into four logical layers.
+
+\textbf{Service consumer layer.} A consumer submits slice objectives to the Kubernetes API as \texttt{E2EQoSIntent} objects. The API server becomes the intent management interface. This choice avoids a separate northbound REST schema and allows all intent instances to inherit Kubernetes access control, versioning, and event semantics.
+
+\textbf{Intent orchestration layer.} The E2E orchestrator acts as an NSMF and intent handler. It watches intent resources, validates the requested service classes, translates the expectations into domain parameters, and records fulfillment state in the intent status. The orchestrator is implemented as a Kubernetes controller so that failed or partial operations can be retried through reconciliation.
+
+\textbf{Southbound interface layer.} The RAN and core domains are configured through different mechanisms. For RAN, the orchestrator uses Nephio Porch to copy, mutate, propose, and approve a package revision. The approved package is synchronized to the workload cluster by Config Sync. For the core, the orchestrator configures free5GC slice and QoS state through core-domain configuration logic. This hybrid design reflects the maturity of the available open-source components: RAN cell configuration maps naturally to a KRM package, while free5GC subscriber/QoS configuration still requires API- or database-facing integration.
+
+\textbf{Domain execution layer.} The workload cluster runs domain operators. The OCUDU operator consumes KRM resources such as cell and PLMN configuration and renders the final gNB configuration. The free5GC-side logic configures the subscriber and QoS information needed for the intended slices. Both domains report status back to the orchestrator.
+
+\subsection{Intent Model}
+
+Listing~\ref{lst:input_intent} illustrates the intent interface. One resource can contain multiple intent groups so that related slices can be reconciled together. Each group contains context, such as target UEs, and expectations, such as slice type, latency, bandwidth, and resource sharing.
+
+\begin{lstlisting}[caption={Example \texttt{E2EQoSIntent} submitted by a consumer.}, label={lst:input_intent}]
+apiVersion: e2e.intent.domain/v1alpha1
+kind: E2EQoSIntent
+metadata:
+  name: slices-intent
+spec:
+  intentGroups:
+    - id: embb
+      contexts:
+        targetUEs: ["208930000000001"]
+      expectations:
+        sliceType: eMBB
+        bandwidth: high
+        resourceShare: Partial
+    - id: urllc
+      contexts:
+        targetUEs: ["208930000000002"]
+      expectations:
+        sliceType: URLLC
+        latency: ultra-low
+        resourceShare: Full
+\end{lstlisting}
+
+The model intentionally separates \emph{what} the consumer wants from \emph{how} each domain realizes it. For example, \texttt{latency: ultra-low} does not name a scheduler parameter. Instead, it signals that the orchestrator should select a low-latency 5QI and a high-priority RAN slice configuration.
+
+\subsection{Cross-Domain Translation}
+\label{subsec:translation}
+
+The translation engine maps intent expectations to concrete domain parameters. Table~\ref{tab:translation} summarizes the mappings used in the prototype. The exact values are policy choices rather than universal constants; the contribution is the translation structure and the ability to materialize it across free5GC and OCUDU.
+
+\begin{table}[t]
+  \caption{Intent-to-configuration mapping used by the prototype.}
+  \label{tab:translation}
+  \begin{tabular}{llll}
+    \toprule
+    Intent & Core QoS & RAN policy & Priority \\
+    \midrule
+    eMBB, high bandwidth & 5QI 9 & PRB max 50\% & 10 \\
+    URLLC, ultra-low latency & 5QI 85 & PRB max 100\% & 200 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The core mapping selects 5QI and QFI values for QoS flows. The RAN mapping selects the S-NSSAI and scheduler configuration used by OCUDU. A \texttt{Full} resource-share intent allows the URLLC slice to use up to all available PRBs when needed, while a \texttt{Partial} resource-share intent bounds the eMBB slice to preserve headroom for higher-priority traffic. The RAN priority value reinforces this differentiation when both slices are active.
+
+\subsection{End-to-End Workflow}
+\label{subsec:e2e_workflow}
+
+The complete workflow has five stages. First, the orchestrator admits the intent by checking whether the requested slice classes and expectation fields are supported by the current policy table. Second, it translates the accepted intent into domain parameters. The output is deterministic for a given policy table, so an operator can inspect the status field and see which 5QI, QFI, SD, PRB ratio, and priority values were derived from the original request. Third, the RAN parameters are inserted into a Nephio package revision that is proposed and approved for GitOps delivery. Fourth, the core parameters are applied to free5GC subscriber and QoS configuration. Finally, the orchestrator observes domain status and updates the top-level fulfillment state.
+
+This workflow separates intent handling from low-level deployment mechanics. A domain-specific failure does not require the consumer to understand Porch, Config Sync, free5GC subscriber records, or OCUDU ConfigMaps. Instead, the consumer sees a single status surface.
+
+\subsection{Fulfillment and Status}
+
+The orchestrator writes translated parameters and domain status into the CRD status field. This follows the Kubernetes convention that \texttt{spec} is desired state and \texttt{status} is observed state. A typical fulfillment record includes the translated core and RAN parameters, the observed generation, and per-domain states such as \texttt{CONFIGURED}, \texttt{DEGRADED}, or \texttt{FAILED}. This status path is important because intent-driven management requires not only execution but also a machine-readable statement of whether the requested outcome is fulfilled.
+
+\begin{lstlisting}[caption={Representative intent status after translation and domain observation.}, label={lst:intent_status}]
+status:
+  observedGeneration: 3
+  fulfillmentState: FULFILLED
+  intentGroupStatuses:
+    - id: embb
+      core: {fiveQI: 9, qfi: 9, state: CONFIGURED}
+      ran:
+        sst: 1
+        sd: 66051
+        maxPrbPolicyRatio: 50
+        priority: 10
+        state: CONFIGURED
+    - id: urllc
+      core: {fiveQI: 85, qfi: 85, state: CONFIGURED}
+      ran:
+        sst: 1
+        sd: 1122867
+        maxPrbPolicyRatio: 100
+        priority: 200
+        state: CONFIGURED
+\end{lstlisting}
+
+Listing~\ref{lst:intent_status} also provides a practical debugging interface. If the RAN package is synchronized but the core path fails, the two domain states diverge and the top-level fulfillment state can move to \texttt{DEGRADED}. If translation itself fails, no southbound mutation is attempted.

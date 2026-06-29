@@ -1,0 +1,18 @@
+\section{Conclusion and Future Work}
+\label{sec:conclusion}
+
+This paper presented an intent-driven orchestration system for 5G RAN and core network slices using free5GC, OCUDU, Kubernetes, and Nephio. The system exposes a Kubernetes-native \texttt{E2EQoSIntent} interface, translates service expectations into core and RAN parameters, and applies the resulting configuration through a hybrid orchestration path. Experiments with eMBB and URLLC slices show that the generated RAN configuration differentiates traffic as intended and that the management-plane latency is dominated by GitOps synchronization. The results suggest that intent-driven management can be implemented today with open-source 5G components, while also identifying where future work is needed for feasibility checking, conflict handling, and stronger end-to-end QoS enforcement.
+
+\subsection{Limitations}
+
+The prototype demonstrates a control pattern rather than a production-ready slice-management platform. It focuses on two representative service classes, eMBB and URLLC; a production system would need a richer catalog of service profiles, tenant quotas, authentication and authorization policies, and explicit rules for deciding whether a requested intent can be accepted.
+
+The evaluation uses emulated UEs and a virtualized Kubernetes environment, so the throughput results should not be interpreted as a production performance benchmark. They validate configuration effects rather than the maximum capacity of the underlying RAN or core implementation. CPU scheduling, virtual networking, and buffering can influence measured loss, jitter, and throughput. The most important evidence is therefore relative: when the generated slice configuration changes, traffic allocation changes in the expected direction.
+
+\subsection{Future Work}
+
+Future work should add 3GPP Release 18 and Release 19 style intent features, including fulfillment feasibility checks, conflict reports, negotiation, and quantitative utility functions. An admission controller could reject impossible or conflicting intents before they trigger package mutation. For example, two tenants could request full PRB access for different URLLC slices at the same time; the current prototype can detect unsupported input, but it does not yet negotiate alternatives or compute a utility-based compromise.
+
+The hybrid southbound design should also be refined. RAN configuration is delivered through Nephio/GitOps because cell and scheduler settings can be represented as structured KRM resources and reviewed before deployment. Core subscriber and QoS configuration is currently handled through free5GC-facing logic because those settings are not yet fully represented as Nephio-ready packages in the testbed. A future implementation should migrate more core-domain state into declarative resources so that both domains can share the same package lifecycle, audit trail, and rollback behavior.
+
+On the data plane, deeper integration with Linux traffic control, UPF-level QoS enforcement, or additional OCUDU scheduling hooks could improve end-to-end differentiation beyond RAN scheduling alone. On the management plane, reducing GitOps synchronization latency or allowing policy-controlled fast paths would make the system applicable to a broader range of operational workflows.
