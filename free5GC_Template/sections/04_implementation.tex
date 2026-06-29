@@ -9,6 +9,24 @@ The controller follows the standard Kubernetes reconciliation pattern. When an \
 
 This idempotent structure is important for GitOps integration. Porch and Config Sync may introduce asynchronous delay, and the Kubernetes API may deliver repeated events for the same resource version. The orchestrator therefore treats every reconciliation as a convergence attempt rather than a one-shot command. A failed stage records a reason and is retried according to the controller runtime backoff policy.
 
+\begin{table}[t]
+  \caption{Controller stages and observable artifacts.}
+  \label{tab:controller_stages}
+  \begin{tabular}{lll}
+    \toprule
+    Stage & Main action & Observable artifact \\
+    \midrule
+    Admit & Check policy table & Status condition \\
+    Translate & Derive core/RAN tuple & Intent status \\
+    Mutate RAN & Patch KRM package & PackageRevision \\
+    Configure core & Bind UE QoS data & Subscriber profile \\
+    Observe & Read domain state & Fulfillment state \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:controller_stages} summarizes the reconciliation pipeline. The implementation keeps these stages explicit in code rather than hiding them behind one monolithic handler. This helped testing because each stage can be exercised with a small fixture: an unsupported intent for admission, a known eMBB/URLLC input for translation, a package containing a cell configuration for RAN mutation, and a subscriber record for the core path. The same stage boundaries are also reflected in log messages and status reasons, which makes a failed run easier to inspect from \texttt{kubectl}.
+
 \subsection{RAN Package Mutation}
 
 For the RAN path, the orchestrator uses Nephio Porch as the package control point. The workflow has four steps. First, the orchestrator copies the blueprint package and pulls a mutable package revision. Second, it patches the structured KRM resource that represents OCUDU cell configuration. Third, it pushes and proposes the package revision. Fourth, it approves the package so that the GitOps pipeline can synchronize it to the workload cluster.
@@ -44,15 +62,44 @@ After synchronization, the OCUDU operator renders the final \texttt{gnb-config.y
 
 Figure~\ref{fig:nephio_workflow} illustrates why the RAN path is modeled as package mutation rather than direct pod modification. The package revision becomes the reviewable artifact, while the workload cluster only consumes approved state. This provides a clean operational boundary: the intent controller decides what RAN policy should change, and the GitOps pipeline decides when the approved configuration reaches the target cluster.
 
+The mutation logic operates on structured YAML objects instead of template strings. The orchestrator locates the cell configuration resource, replaces only the \texttt{spec.slicing} entries, and preserves unrelated physical-layer fields such as band, ARFCN, bandwidth, and subcarrier spacing. It also updates the PLMN slice list so that the broadcast network identity remains consistent with the scheduler configuration. This is a small but important engineering detail: a scheduler entry alone is insufficient if UEs cannot discover or request the same S-NSSAI during registration and session establishment.
+
+The resulting package is intentionally self-contained. A reviewer can inspect the package revision and see the old and new slice entries before approval, while the workload cluster receives the same artifact through Config Sync. This differs from a direct imperative update to a running ConfigMap, where the final state may be correct but the path that produced it is harder to audit or roll back.
+
 \subsection{Core-Domain Configuration}
 
 The core path configures free5GC with the QoS and slice information required by the target UEs. The relevant state includes S-NSSAI, subscriber binding, PDU session QoS, QFI, and 5QI. The prototype uses direct core-domain configuration because these parts of free5GC are not fully represented as Nephio-ready KRM packages in the testbed. This design is intentionally pragmatic: it keeps the end-to-end intent contract stable while allowing each domain to use the most reliable available southbound mechanism.
 
 The core implementation performs consistency checks before reporting success. For each target UE, it verifies that the intended S-NSSAI and QoS profile are present in the core-domain state. This does not prove that every packet will receive the desired treatment, because runtime QoS still depends on UPF and kernel behavior, but it does prove that the control-plane configuration requested by the intent is present.
 
+The core path is organized around UE binding. For every \texttt{targetUEs} entry in an intent group, the orchestrator ensures that the subscriber profile contains the intended S-NSSAI and that the session management data contains the selected 5QI/QFI values. If the UE profile already exists, the orchestrator updates only the slice-related fields required by the active intent. If the profile is absent in the testbed, it can create the minimal subscriber state needed for the experiment. This behavior makes repeated experiments reproducible because the same intent converges to the same core-domain state.
+
+The implementation treats this path as a compatibility layer rather than a permanent architectural preference. A fully declarative core package would be cleaner because RAN and core changes could share the same package lifecycle. However, forcing all free5GC subscriber data into an incomplete package abstraction would make the prototype less reliable. The hybrid path therefore preserves the most important property for this paper: a single high-level intent produces aligned core and RAN configuration, even though the two domains currently require different delivery mechanisms.
+
 \subsection{Hierarchical RAN Resources}
 
 The OCUDU domain is represented with a small hierarchy of CRDs. \texttt{OCUDUConfig} captures application-level settings such as CU/DU deployment and radio-emulation parameters. \texttt{OCUDUCellConfig} captures cell-level settings, including slice-aware scheduling. \texttt{PLMNConfig} captures network identity and S-NSSAI information. Splitting the configuration this way avoids large monolithic resources and lets the operator validate each layer independently before producing the final ConfigMap.
+
+The domain operator performs reference walking across these resources. Starting from the deployment resource, it resolves the referenced application, cell, and PLMN objects, validates that the referenced slices are mutually consistent, and then renders the final gNB configuration. When rendering succeeds, the operator updates Kubernetes resources and marks the deployment as ready. When a referenced object is missing or inconsistent, the operator records a condition instead of producing a partial configuration. This local check is separate from the E2E orchestrator's admission policy; it protects the workload cluster from broken package content that might have been introduced manually or by a later controller.
+
+\begin{lstlisting}[caption={Representative rendered scheduler fragment.}, label={lst:rendered_scheduler}]
+cell_cfg:
+  slicing:
+    - sst: 1
+      sd: 0x010203
+      sched_cfg:
+        min_prb_policy_ratio: 0
+        max_prb_policy_ratio: 50
+        priority: 10
+    - sst: 1
+      sd: 0x112233
+      sched_cfg:
+        min_prb_policy_ratio: 0
+        max_prb_policy_ratio: 100
+        priority: 200
+\end{lstlisting}
+
+Listing~\ref{lst:rendered_scheduler} shows the final form consumed by the RAN software. Comparing this artifact with the original intent and the intermediate package gives a concrete end-to-end trace: service expectation, translated profile, KRM package, and rendered runtime configuration.
 
 \subsection{Failure Handling}
 

@@ -48,6 +48,31 @@ spec:
 
 The model intentionally separates \emph{what} the consumer wants from \emph{how} each domain realizes it. For example, \texttt{latency: ultra-low} does not name a scheduler parameter. Instead, it signals that the orchestrator should select a low-latency 5QI and a high-priority RAN slice configuration.
 
+\subsection{Admission and Policy Scope}
+\label{subsec:admission}
+
+An intent interface must reject requests that the current deployment cannot safely realize. The prototype therefore separates \emph{schema validation} from \emph{policy admission}. Schema validation is handled by the Kubernetes API server and checks the shape of the \texttt{E2EQoSIntent} object, such as required fields and allowed enum values. Policy admission is handled by the orchestrator during reconciliation and checks whether the requested slice classes, resource-sharing modes, and UE bindings are supported by the active translation table.
+
+This distinction keeps the CRD stable while allowing operator policy to evolve. For example, the CRD can accept a general \texttt{latency} expectation, but a particular deployment may only admit \texttt{ultra-low} latency for a small set of URLLC service profiles. Similarly, a tenant may be allowed to request \texttt{Partial} sharing but not \texttt{Full} sharing. The current prototype implements a compact policy table for two service classes, eMBB and URLLC, because these classes are sufficient to exercise both throughput-oriented and latency-sensitive translation paths.
+
+\begin{table}[t]
+  \caption{Admission policy used in the prototype.}
+  \label{tab:admission}
+  \begin{tabular}{lll}
+    \toprule
+    Field & Accepted values & Validation action \\
+    \midrule
+    \texttt{sliceType} & eMBB, URLLC & Select profile \\
+    \texttt{bandwidth} & high, best-effort & Map to 5QI/PRB policy \\
+    \texttt{latency} & ultra-low, low, medium & Map to 5QI priority \\
+    \texttt{resourceShare} & Partial, Full & Bound PRB maximum \\
+    \texttt{targetUEs} & Registered IMSI list & Bind core profile \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:admission} shows the policy dimensions used by the implementation. Unsupported combinations are not silently downgraded. Instead, the orchestrator records a rejected or failed fulfillment state with a reason in \texttt{status}. This behavior is important for intent management because a consumer should be able to distinguish between a malformed request, an unsupported service objective, and a temporary southbound delivery failure.
+
 \subsection{Cross-Domain Translation}
 \label{subsec:translation}
 
@@ -67,6 +92,27 @@ The translation engine maps intent expectations to concrete domain parameters. T
 \end{table}
 
 The core mapping selects 5QI and QFI values for QoS flows. The RAN mapping selects the S-NSSAI and scheduler configuration used by OCUDU. A \texttt{Full} resource-share intent allows the URLLC slice to use up to all available PRBs when needed, while a \texttt{Partial} resource-share intent bounds the eMBB slice to preserve headroom for higher-priority traffic. The RAN priority value reinforces this differentiation when both slices are active.
+
+The translation algorithm is deterministic. For each admitted intent group, it first resolves the service profile, then derives the core QoS tuple, then derives the RAN scheduling tuple, and finally verifies that both domains refer to the same S-NSSAI. This last check avoids a common configuration error in manual experiments: the core may admit a PDU session for one slice identifier while the RAN scheduler is configured for another. In the prototype, the SD value is stored in one normalized integer form inside the status field, even if an operator originally specified it in hexadecimal notation. The status field therefore becomes the common audit surface across the human-readable intent and the domain-specific configuration files.
+
+\begin{lstlisting}[caption={Simplified translation procedure.}, label={lst:translation_algo}]
+for group in intent.spec.intentGroups:
+  profile = admit(group.expectations)
+  core = {
+    snssai: profile.snssai,
+    fiveQI: profile.fiveQI,
+    qfi: profile.qfi
+  }
+  ran = {
+    snssai: profile.snssai,
+    maxPrbPolicyRatio: profile.maxPrb,
+    priority: profile.priority
+  }
+  assert core.snssai == ran.snssai
+  status.intentGroupStatuses.append(core, ran)
+\end{lstlisting}
+
+Listing~\ref{lst:translation_algo} omits implementation details, but captures the design constraint: the orchestrator does not independently choose core and RAN parameters. It chooses a profile and projects that profile into each domain. This reduces the chance of cross-domain drift and makes later policy extensions easier. Adding a new service class mainly requires adding another profile and its admissible expectation values, rather than rewriting the RAN and core logic separately.
 
 \subsection{End-to-End Workflow}
 \label{subsec:e2e_workflow}
