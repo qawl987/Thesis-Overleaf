@@ -7,8 +7,6 @@ Intent-driven management addresses this gap by allowing a consumer to state the 
 
 This work builds an intent-driven orchestration system for open-source 5G network slices. The design uses Kubernetes as the intent interface and execution substrate. A consumer submits an \texttt{E2EQoSIntent} custom resource that describes slice expectations, such as \texttt{bandwidth: high}, \texttt{latency: ultra-low}, and \texttt{resourceShare: Full}. The orchestrator translates these expectations into domain parameters: 5QI and QFI for the 5G core, plus S-NSSAI, PRB policy ratios, and scheduling priority for the RAN. The translated state is then applied through a hybrid southbound path. RAN changes are handled as declarative Nephio package mutations that are synchronized to the workload cluster through GitOps. Core changes are applied through free5GC-facing configuration logic because the required subscriber and QoS data are not yet naturally represented as a complete Nephio package in the tested environment.
 
-This paper condenses a larger thesis into a 9-page ACM-style submission. We deliberately omit two implementation-heavy topics from the longer document: cloud-network topology and logical interface management with Multus/IPAM, and the GNU Radio based multi-user RF bridge. The resulting paper focuses on the research contribution most relevant to the forum: intent representation, cross-domain translation, orchestration paths, and empirical validation on free5GC and OCUDU.
-
 The contributions are:
 \begin{itemize}
   \item We design a Kubernetes-native intent model, \texttt{E2EQoSIntent}, for describing multiple 5G slice objectives in one end-to-end resource.
