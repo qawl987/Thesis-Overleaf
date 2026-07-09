@@ -1,7 +1,7 @@
 ﻿\section{Implementation}
 \label{sec:implementation}
 
-The prototype is implemented in Golang with Kubebuilder. The controller watches \texttt{E2EQoSIntent} resources, computes translated parameters, invokes the RAN and core southbound paths, and updates status after the domain operations complete.
+The prototype uses three Kubernetes controllers: the E2E Intent Orchestrator, the OCUDU Operator, and Nephio's free5GC Operator. The orchestrator translates \texttt{E2EQoSIntent} resources and coordinates the southbound paths. The two domain operators reconcile the RAN and core workloads as RAN NSSMF and Core NSSMF/VNFM components.
 
 \subsection{Controller Lifecycle}
 
@@ -50,7 +50,7 @@ spec:
         priority: 200
 \end{lstlisting}
 
-After synchronization, the OCUDU operator renders the final \texttt{gnb-config.yml} and updates the gNB-related Kubernetes objects. This preserves Git as the single source of truth for RAN configuration and allows package-level review or rollback.
+After synchronization, the OCUDU Operator renders the final \texttt{gnb-config.yml} and updates the gNB-related Kubernetes objects. Nephio and Config Sync deliver the KRM objects, and the operator performs the domain-specific realization needed to make that desired state executable by OCUDU. This preserves Git as the source of truth and allows package-level review or rollback.
 
 \begin{figure}[t]
   \centering
@@ -66,9 +66,11 @@ The mutation logic operates on structured YAML objects instead of template strin
 
 The resulting package is intentionally self-contained. A reviewer can inspect the package revision and see the old and new slice entries before approval, while the workload cluster receives the same artifact through Config Sync. This differs from a direct imperative update to a running ConfigMap, where the final state may be correct but the path that produced it is harder to audit or roll back.
 
-\subsection{Core-Domain Configuration}
+\subsection{free5GC Operator and Core-Domain Configuration}
 
-The core path configures free5GC with the QoS and slice information required by the target UEs. The relevant state includes S-NSSAI, subscriber binding, PDU session QoS, QFI, and 5QI. The prototype uses direct core-domain configuration because these parts of free5GC are not fully represented as Nephio-ready KRM packages in the testbed. This design is intentionally pragmatic: it keeps the end-to-end intent contract stable while allowing each domain to use the most reliable available southbound mechanism.
+The Core NSSMF path uses the official free5GC Operator provided by Nephio. It watches \texttt{NFDeployment} resources, runs a reconciliation loop, and maintains the desired deployment state of free5GC network functions. This gives the core domain the same Kubernetes-native lifecycle behavior used by other Nephio-managed workloads.
+
+Dynamic subscriber and QoS state follows a complementary path because it is not fully represented by the operator's deployment resources. The orchestrator uses the free5GC WebConsole API to configure S-NSSAI, subscriber binding, PDU session QoS, QFI, and 5QI for the target UEs. Separating NF deployment from subscriber configuration keeps the Core NSSMF role explicit without attributing unsupported runtime functions to the official operator.
 
 The core implementation performs consistency checks before reporting success. For each target UE, it verifies that the intended S-NSSAI and QoS profile are present in the core-domain state. This does not prove that every packet will receive the desired treatment, because runtime QoS still depends on UPF and kernel behavior, but it does prove that the control-plane configuration requested by the intent is present.
 
@@ -76,11 +78,11 @@ The core path is organized around UE binding. For every \texttt{targetUEs} entry
 
 The implementation treats this path as a compatibility layer rather than a permanent architectural preference. A fully declarative core package would be cleaner because RAN and core changes could share the same package lifecycle. However, forcing all free5GC subscriber data into an incomplete package abstraction would make the prototype less reliable. The hybrid path therefore preserves the most important property for this paper: a single high-level intent produces aligned core and RAN configuration, even though the two domains currently require different delivery mechanisms.
 
-\subsection{Hierarchical RAN Resources}
+\subsection{OCUDU Operator and Hierarchical RAN Resources}
 
-The OCUDU domain is represented with a small hierarchy of CRDs. \texttt{OCUDUConfig} captures application-level settings such as CU/DU deployment and radio-emulation parameters. \texttt{OCUDUCellConfig} captures cell-level settings, including slice-aware scheduling. \texttt{PLMNConfig} captures network identity and S-NSSAI information. Splitting the configuration this way avoids large monolithic resources and lets the operator validate each layer independently before producing the final ConfigMap.
+\texttt{OCUDUConfig} captures application-level settings such as CU/DU deployment and radio-emulation parameters. \texttt{OCUDUCellConfig} captures cell-level settings, including slice-aware scheduling. \texttt{PLMNConfig} captures network identity and S-NSSAI information. Splitting the configuration this way avoids large monolithic resources and lets the operator validate each layer independently before producing the final ConfigMap.
 
-The domain operator performs reference walking across these resources. Starting from the deployment resource, it resolves the referenced application, cell, and PLMN objects, validates that the referenced slices are mutually consistent, and then renders the final gNB configuration. When rendering succeeds, the operator updates Kubernetes resources and marks the deployment as ready. When a referenced object is missing or inconsistent, the operator records a condition instead of producing a partial configuration. This local check is separate from the E2E orchestrator's admission policy; it protects the workload cluster from broken package content that might have been introduced manually or by a later controller.
+The OCUDU Operator performs reference walking across these resources. Starting from the deployment resource, it resolves the referenced application, cell, and PLMN objects, validates that the referenced slices are mutually consistent, and then renders the final gNB configuration. When rendering succeeds, it updates Kubernetes resources and marks the deployment as ready. When a referenced object is missing or inconsistent, it records a condition instead of producing a partial configuration. This local check is separate from the E2E orchestrator's admission policy and protects the workload cluster from broken package content.
 
 \begin{lstlisting}[caption={Representative rendered scheduler fragment.}, label={lst:rendered_scheduler}]
 cell_cfg:
@@ -103,10 +105,6 @@ Listing~\ref{lst:rendered_scheduler} shows the final form consumed by the RAN so
 
 \subsection{Failure Handling}
 
-The prototype distinguishes three failure classes. Translation failures occur before any southbound operation, such as an unsupported slice type or an impossible combination of expectations. Delivery failures occur when the RAN package cannot be mutated, approved, or synchronized. Domain failures occur when the package is delivered but the local operator cannot render or apply the final configuration. These classes are written into intent status so that the consumer can tell whether the problem is semantic, pipeline-related, or domain-local.
+The prototype distinguishes three failure classes. Translation failures occur before any southbound operation, such as an unsupported slice type or an impossible combination of expectations. Delivery failures occur when a package cannot be mutated, approved, or synchronized. Domain failures occur when either domain operator cannot reconcile its delivered resources. These classes are written into intent status so that the consumer can tell whether the problem is semantic, pipeline-related, or domain-local.
 
 This failure taxonomy is deliberately aligned with future 3GPP intent features. Feasibility checks and conflict reports can be added before translation, while negotiation and utility functions can be added as policy modules that select among alternative translations. The current implementation is therefore a first step toward richer intent handling rather than a closed one-off script.
-
-\subsection{Scope}
-
-The longer thesis also contains detailed logical-interface management with Multus/IPAM and a GNU Radio bridge for multi-user RF emulation. These components are useful for a complete lab deployment but are not essential to the ACM paper's main claim. They are therefore excluded from this submission draft to keep the focus on intent translation and orchestration.

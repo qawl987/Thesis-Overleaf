@@ -11,11 +11,11 @@ For the core network, free5GC implements a 5G core following the service-based a
 
 Kubernetes offers a declarative API and a reconciliation model that are well matched to intent management. Custom Resource Definitions (CRDs) extend the API with domain-specific objects~\cite{kubernetes_custom_resources}. Operators then reconcile desired state into actual runtime state~\cite{kubernetes_operator_pattern,kubernetes_controller}. This makes Kubernetes a natural substrate for expressing both high-level intent and low-level network-function configuration.
 
-Nephio extends this model with package orchestration for telecom workloads. It uses Kubernetes Resource Model (KRM) packages, Porch package revisions, and GitOps synchronization to propagate configuration from a management cluster to workload clusters~\cite{nephio,google_config_sync,cncf_gitops_2025}. This approach provides version control, review, and rollback semantics for network configuration. It is especially attractive for RAN configuration because changes to cell-level scheduling policy can be represented as structured KRM resources before being rendered into the final OCUDU configuration.
+Nephio extends this model with KRM packages, Porch package revisions, and GitOps synchronization~\cite{nephio,google_config_sync,cncf_gitops_2025}. This provides version control, review, and rollback for network configuration. Nephio provides a free5GC Operator that reconciles \texttt{NFDeployment} resources and manages the lifecycle of core network functions. The RAN path uses the OCUDU Operator to perform the corresponding domain-specific translation and reconciliation for OCUDU resources.
 
 \subsection{Gap}
 
-Prior work on intent-based and autonomous network management proposes architectures for translating service objectives into network behavior~\cite{chirivella2023e2e,martini2023intent,tran2024ina,antonakoglou2025camino,nahum2025intent}. Recent work also studies GitOps performance for network automation~\cite{ghosh2025performance}. The remaining gap is a concrete end-to-end prototype that connects intent submission, cross-domain translation, Nephio-based RAN mutation, free5GC QoS configuration, and experimental validation with open-source 5G components. This paper addresses that gap.
+Prior work on intent-based and autonomous network management proposes architectures for translating service objectives into network behavior~\cite{chirivella2023e2e,martini2023intent,tran2024ina,antonakoglou2025camino,nahum2025intent}. Recent work also studies GitOps performance~\cite{ghosh2025performance}. The remaining gap is an end-to-end prototype connecting intent submission, cross-domain translation, Nephio package workflows, RAN and core NSSMF reconciliation, free5GC QoS configuration, and experimental validation.
 
 \begin{table}[t]
   \caption{Positioning of this work relative to open-source slice-management building blocks.}
@@ -27,9 +27,9 @@ Prior work on intent-based and autonomous network management proposes architectu
     free5GC & 5G core and QoS configuration & No end-to-end intent interface \\
     OCUDU & RAN and slice scheduler parameters & Requires low-level scheduler configuration \\
     Kubernetes & Declarative API and reconciliation & Needs telecom-specific translation logic \\
-    Nephio & Package lifecycle and GitOps delivery & Needs intent-derived package mutation \\
+    Nephio & Package lifecycle and free5GC Operator & Needs intent-derived RAN mutation \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:positioning} highlights the design premise. Each component already solves part of the deployment problem, but none of them alone provides a complete path from service intent to realized RAN and core configuration. The proposed orchestrator is therefore intentionally small: it does not replace free5GC, OCUDU, Kubernetes, or Nephio. Instead, it connects their control surfaces and records the translation decisions needed to make slice fulfillment auditable.
+Table~\ref{tab:positioning} highlights the design premise. Each component solves part of the deployment problem, but none provides a complete path from service intent to realized RAN and core configuration. The E2E orchestrator connects their control surfaces; the OCUDU and free5GC Operators then serve as the RAN and core domain reconcilers, respectively.

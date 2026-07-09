@@ -24,20 +24,20 @@ The testbed uses MicroK8s v1.28, Nephio R5, free5GC v4.2.1, OCUDU release 26.04,
     5G core & free5GC v4.2.1 \\
     RAN & OCUDU release 26.04 \\
     UE emulator & srsUE v25.10 \\
-    Orchestrator & Golang/Kubebuilder prototype \\
+    Orchestrator/operator & Golang/Kubebuilder prototypes \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 The evaluation uses two deployment modes because they answer different questions. The local mode removes Kubernetes and GitOps from the data path and establishes whether the generated RAN scheduling configuration has the intended qualitative effect. The cloud-native mode then verifies whether the same configuration can be produced through the proposed intent, Nephio, and operator pipeline. This separation is useful because a negative result in the cloud-native test could come from either an incorrect slice policy or from the deployment pipeline; the local baseline helps separate those causes.
 
-The management cluster hosts the E2E orchestrator and Porch-facing package workflow. The workload cluster hosts free5GC, the OCUDU-related resources, Config Sync, and the domain operator. UE and traffic-generation components are treated as test resources rather than managed network functions. This keeps the system under test focused on the infrastructure that would normally be operated by an NSMF/NSSMF-style automation stack.
+The management cluster hosts the E2E orchestrator and Porch-facing package workflow. The workload cluster hosts Config Sync, the OCUDU Operator, Nephio's free5GC Operator, and their managed network functions. The orchestrator realizes the NSMF/intent-handler role, while the two domain operators realize RAN NSSMF and Core NSSMF/VNFM responsibilities. UE and traffic-generation components are treated as test resources rather than managed network functions.
 
 \subsection{Metrics}
 
 The evaluation separates data-plane and management-plane metrics. The data-plane measurements focus on throughput, packet loss, and jitter as reported by \texttt{iperf3}. These metrics are not intended to certify carrier-grade QoS; they are used to confirm whether the RAN scheduler reacts to the generated slice parameters. The management-plane measurements focus on orchestration latency and fulfillment state. This distinction is important because an intent system can correctly configure the network but still be too slow for a particular operational use case.
 
-For management-plane latency, the most relevant question is not only total time but also the distribution across stages. A long delay inside the orchestrator would suggest inefficient translation or API use. A long delay inside GitOps synchronization suggests a trade-off between auditability and actuation speed. A long delay inside the local operator would indicate domain-specific rendering or rollout overhead.
+For management-plane latency, the most relevant question is not only total time but also the distribution across stages. A long delay inside the orchestrator would suggest inefficient translation or API use. A long delay inside GitOps synchronization suggests a trade-off between auditability and actuation speed. A long delay inside the OCUDU Operator would indicate domain-specific rendering or rollout overhead.
 
 \begin{table}[t]
   \caption{Traffic model for data-plane experiments.}
@@ -57,7 +57,7 @@ Table~\ref{tab:traffic_model} defines the common traffic pattern. The overlap ph
 
 \subsection{Data-Plane Slice Differentiation}
 
-The first experiment validates the generated slice configuration in a local environment. Two UEs are associated with different slices. UE1 is mapped to eMBB with 5QI 9 and a partial PRB share. UE2 is mapped to URLLC with a delay-critical 5QI and a full PRB share. The traffic pattern has three phases: only eMBB is active from 0--15 seconds, both eMBB and URLLC are active from 15--45 seconds, and only eMBB remains active from 45--60 seconds.
+The first experiment validates the generated slice configuration in a local environment. Two UEs are associated with different slices. UE1 is mapped to eMBB with 5QI 6 and a partial PRB share. UE2 is mapped to URLLC with a delay-critical 5QI and a full PRB share. The traffic pattern has three phases: only eMBB is active from 0--15 seconds, both eMBB and URLLC are active from 15--45 seconds, and only eMBB remains active from 45--60 seconds.
 
 \begin{figure}[t]
   \centering
@@ -75,7 +75,7 @@ The eMBB degradation during the overlap phase is not instantaneous. In several r
 
 \subsection{Kubernetes/Nephio Deployment}
 
-The second experiment runs the orchestration path through the Kubernetes and Nephio environment. The same eMBB and URLLC intent is submitted as a CRD. The orchestrator mutates the RAN package, Config Sync applies the package to the workload cluster, and the OCUDU operator renders the final configuration.
+The second experiment runs the orchestration path through the Kubernetes and Nephio environment. The same eMBB and URLLC intent is submitted as a CRD. The orchestrator mutates the RAN package, Config Sync applies it to the workload cluster, and the OCUDU Operator validates the synchronized resources and renders the final configuration. In parallel, the free5GC Operator maintains the core NF deployment and the core-facing path applies subscriber QoS state.
 
 \begin{figure}[t]
   \centering
@@ -87,7 +87,7 @@ The second experiment runs the orchestration path through the Kubernetes and Nep
 
 Figure~\ref{fig:k8s_qos} shows the same differentiation trend after orchestration through the cloud-native workflow. Absolute throughput is lower than in the local test because the virtualized Kubernetes environment adds scheduling and networking overhead. Nevertheless, the generated configuration remains effective: when URLLC becomes active, it receives a larger share of available radio resources, and eMBB throughput decreases accordingly.
 
-The cloud-native experiment also validates configuration consistency across asynchronous control loops. The E2E orchestrator completes its mutation before Config Sync necessarily applies the package; the domain operator then runs after the package reaches the workload cluster. A correct final result therefore requires all three loops to converge on the same desired state. The observed traffic behavior provides data-plane evidence of this convergence, while the fulfillment checks in the next subsection provide management-plane evidence.
+The cloud-native experiment also validates configuration consistency across asynchronous control loops. The E2E orchestrator completes its mutation before Config Sync applies the package; the domain operators then reconcile resources after they reach the workload cluster. A correct final result therefore requires these loops to converge on the same desired state. The observed traffic behavior provides data-plane evidence of this convergence, while the fulfillment checks in the next subsection provide management-plane evidence.
 
 In the Kubernetes testbed, the maximum stable offered rate is lower than in the local baseline. This result is not surprising because the experiment runs the 5G core, RAN components, UE emulation, and automation services inside a virtualized cluster. The measured absolute rate should therefore be read as a property of the testbed, not as a limit of the intent design. The comparison that matters for this paper is whether the relative eMBB/URLLC behavior is preserved when the configuration is generated and delivered through the full orchestration path.
 
@@ -110,13 +110,13 @@ After each orchestration run, we verify fulfillment at three levels. First, the 
   \end{tabular}
 \end{table}
 
-These checks are intentionally simple and reproducible. They give the operator confidence that the declarative request, package artifact, and runtime configuration are aligned. They also make it easier to localize faults: for example, if the package is correct but the ConfigMap is not, the likely issue is in the domain operator rather than the translation engine.
+These checks show that the declarative request, package artifact, and runtime configuration are aligned. They also localize faults: if the package is correct but the ConfigMap is not, the likely issue is in OCUDU reconciliation rather than in Nephio delivery or intent translation.
 
 The verification script performs these checks after each run rather than relying only on the final traffic plot. This matters because data-plane results can be noisy in an emulated setup. A noisy result with correct fulfillment indicates a testbed performance issue, while a noisy result with incorrect fulfillment indicates an orchestration bug. In our runs, the translated intent status, package resource, rendered ConfigMap, and core profile agreed on the selected S-NSSAIs and QoS values.
 
 \subsection{Management-Plane Latency}
 
-We measure orchestration latency by recording four timestamps: $T_0$, when the \texttt{E2EQoSIntent} is applied; $T_1$, when Porch package mutation and approval complete; $T_2$, when Config Sync applies the package to the workload cluster; and $T_3$, when the OCUDU operator updates the final ConfigMap. The total latency is:
+We measure orchestration latency by recording four timestamps: $T_0$, when the \texttt{E2EQoSIntent} is applied; $T_1$, when Porch package mutation and approval complete; $T_2$, when Config Sync applies the package to the workload cluster; and $T_3$, when the OCUDU Operator updates the final ConfigMap. The total latency is:
 \begin{equation}
   T_{total} = (T_1 - T_0) + (T_2 - T_1) + (T_3 - T_2).
 \end{equation}
@@ -138,17 +138,17 @@ We measure orchestration latency by recording four timestamps: $T_0$, when the \
     \midrule
     Orchestrator + Porch, $T_1 - T_0$ & 7.348 s \\
     Config Sync, $T_2 - T_1$ & 22.659 s \\
-    OCUDU operator, $T_3 - T_2$ & 0.068 s \\
+    OCUDU Operator, $T_3 - T_2$ & 0.068 s \\
     \midrule
     Total, $T_{total}$ & 30.077 s \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Figure~\ref{fig:latency} and Table~\ref{tab:latency} show that total orchestration latency is about 30 seconds in the representative run. The dominant component is GitOps synchronization, not local operator reconciliation. This is an important engineering trade-off: GitOps adds auditability and rollback, but it is not a sub-second control loop. The design is therefore suitable for slice provisioning and policy updates, while fast per-packet or per-TTI adaptation should remain inside the RAN scheduler or a near-real-time control loop.
+Figure~\ref{fig:latency} and Table~\ref{tab:latency} show that total orchestration latency is about 30 seconds in the representative run. The dominant component is GitOps synchronization, not OCUDU reconciliation. This is an important engineering trade-off: GitOps adds auditability and rollback, but it is not a sub-second control loop. The design is therefore suitable for slice provisioning and policy updates, while fast per-packet or per-TTI adaptation should remain inside the RAN scheduler or a near-real-time control loop.
 
-The result also gives guidance for future optimization. The orchestrator and Porch stage contains translation, package mutation, and approval; at roughly seven seconds in the representative sample, it is visible but not dominant. The local operator stage is effectively negligible in comparison, which suggests that rendering a cell configuration from structured resources is not the bottleneck. Reducing total actuation time would therefore mainly require changing the synchronization policy, shortening the Config Sync interval, or adding a controlled fast path for low-risk updates. Such changes would trade some audit delay for faster convergence and should be exposed as operator policy rather than hidden inside the intent translation logic.
+The result also gives guidance for future optimization. The orchestrator and Porch stage contains translation, package mutation, and approval. The OCUDU Operator completes reference resolution, validation, and rendering in 0.068 seconds in this sample, showing that domain realization is not the bottleneck. Reducing total actuation time would mainly require changing the synchronization policy, shortening the Config Sync interval, or adding a controlled fast path.
 
 \subsection{Summary of Findings}
 
-The evaluation supports three findings. First, the CRD-based intent interface is sufficient to express multiple slice objectives and preserve their translated parameters in status. Second, the generated OCUDU configuration changes traffic allocation in the expected direction for eMBB and URLLC flows. Third, the orchestration path is dominated by GitOps synchronization time. These findings suggest that the design is appropriate for provisioning and policy-level reconfiguration, but not for millisecond-scale radio adaptation.
+The evaluation supports four findings. First, the CRD-based intent interface expresses multiple slice objectives and preserves their translated parameters. Second, the domain operators reconcile synchronized KRM resources into RAN and core deployments. Third, the generated configuration changes traffic allocation in the expected direction. Fourth, the orchestration path is dominated by GitOps synchronization rather than domain reconciliation. The design is appropriate for provisioning and policy-level reconfiguration, but not for millisecond-scale radio adaptation.

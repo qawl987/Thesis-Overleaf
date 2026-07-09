@@ -15,9 +15,9 @@ Figure~\ref{fig:system_arch} shows the proposed architecture. The system is divi
 
 \textbf{Intent orchestration layer.} The E2E orchestrator acts as an NSMF and intent handler. It watches intent resources, validates the requested service classes, translates the expectations into domain parameters, and records fulfillment state in the intent status. The orchestrator is implemented as a Kubernetes controller so that failed or partial operations can be retried through reconciliation.
 
-\textbf{Southbound interface layer.} The RAN and core domains are configured through different mechanisms. For RAN, the orchestrator uses Nephio Porch to copy, mutate, propose, and approve a package revision. The approved package is synchronized to the workload cluster by Config Sync. For the core, the orchestrator configures free5GC slice and QoS state through core-domain configuration logic. This hybrid design reflects the maturity of the available open-source components: RAN cell configuration maps naturally to a KRM package, while free5GC subscriber/QoS configuration still requires API- or database-facing integration.
+\textbf{Southbound interface layer.} The RAN and core domains are configured through different mechanisms. For RAN, the orchestrator uses Nephio Porch to copy, mutate, propose, and approve a package revision. The approved package is synchronized to the workload cluster by Config Sync. For the core, Nephio packages describe free5GC network-function deployment, while the orchestrator injects dynamic subscriber and QoS state through free5GC-facing logic. This hybrid design separates declarative NF lifecycle management from API-facing subscriber configuration.
 
-\textbf{Domain execution layer.} The workload cluster runs domain operators. The OCUDU operator consumes KRM resources such as cell and PLMN configuration and renders the final gNB configuration. The free5GC-side logic configures the subscriber and QoS information needed for the intended slices. Both domains report status back to the orchestrator.
+\textbf{Domain execution layer.} The workload cluster runs two domain controllers. The OCUDU Operator acts as the RAN NSSMF: it consumes cell, PLMN, and deployment resources, validates their relationships, renders gNB configuration, and reconciles the RAN workload. The official Nephio free5GC Operator acts as the Core NSSMF/VNFM: it watches \texttt{NFDeployment} resources and reconciles the free5GC network functions. Subscriber and QoS updates complement this lifecycle path through the core-facing interface. Both domains report status back to the orchestrator.
 
 \subsection{Intent Model}
 
@@ -58,17 +58,19 @@ This distinction keeps the CRD stable while allowing operator policy to evolve. 
 \begin{table}[t]
   \caption{Admission policy used in the prototype.}
   \label{tab:admission}
+  \resizebox{\columnwidth}{!}{%
   \begin{tabular}{lll}
     \toprule
     Field & Accepted values & Validation action \\
     \midrule
     \texttt{sliceType} & eMBB, URLLC & Select profile \\
-    \texttt{bandwidth} & high, best-effort & Map to 5QI/PRB policy \\
-    \texttt{latency} & ultra-low, low, medium & Map to 5QI priority \\
+    \texttt{bandwidth} & dedicated-high, high, standard & Map to 5QI \\
+    \texttt{latency} & ultra-low, low, medium & Map to 5QI \\
     \texttt{resourceShare} & Partial, Full & Bound PRB maximum \\
     \texttt{targetUEs} & Registered IMSI list & Bind core profile \\
     \bottomrule
   \end{tabular}
+  }
 \end{table}
 
 Table~\ref{tab:admission} shows the policy dimensions used by the implementation. Unsupported combinations are not silently downgraded. Instead, the orchestrator records a rejected or failed fulfillment state with a reason in \texttt{status}. This behavior is important for intent management because a consumer should be able to distinguish between a malformed request, an unsupported service objective, and a temporary southbound delivery failure.
@@ -79,19 +81,31 @@ Table~\ref{tab:admission} shows the policy dimensions used by the implementation
 The translation engine maps intent expectations to concrete domain parameters. Table~\ref{tab:translation} summarizes the mappings used in the prototype. The exact values are policy choices rather than universal constants; the contribution is the translation structure and the ability to materialize it across free5GC and OCUDU.
 
 \begin{table}[t]
-  \caption{Intent-to-configuration mapping used by the prototype.}
+  \caption{Complete intent-to-configuration mapping.}
   \label{tab:translation}
-  \begin{tabular}{llll}
+  \scriptsize
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{lll}
     \toprule
-    Intent & Core QoS & RAN policy & Priority \\
+    Domain & Intent input & Translated output \\
     \midrule
-    eMBB, high bandwidth & 5QI 9 & PRB max 50\% & 10 \\
-    URLLC, ultra-low latency & 5QI 85 & PRB max 100\% & 200 \\
+    Core & URLLC, \texttt{latency=ultra-low} & 5QI 85 \\
+    Core & URLLC, \texttt{latency=low} & 5QI 82 \\
+    Core & URLLC, \texttt{latency=medium} & 5QI 84 \\
+    Core & eMBB, \texttt{bandwidth=dedicated-high} & 5QI 4 \\
+    Core & eMBB, \texttt{bandwidth=high} & 5QI 6 \\
+    Core & eMBB, \texttt{bandwidth=standard} & 5QI 9 \\
+    \midrule
+    RAN & URLLC & SST 1, SD 1122867 (\texttt{0x112233}), priority 200 \\
+    RAN & eMBB & SST 1, SD 66051 (\texttt{0x010203}), priority 10 \\
+    RAN & \texttt{resourceShare=Full} & PRB ratio 0--100\% \\
+    RAN & \texttt{resourceShare=Partial} & PRB ratio 0--50\% \\
     \bottomrule
   \end{tabular}
+  }
 \end{table}
 
-The core mapping selects 5QI and QFI values for QoS flows. The RAN mapping selects the S-NSSAI and scheduler configuration used by OCUDU. A \texttt{Full} resource-share intent allows the URLLC slice to use up to all available PRBs when needed, while a \texttt{Partial} resource-share intent bounds the eMBB slice to preserve headroom for higher-priority traffic. The RAN priority value reinforces this differentiation when both slices are active.
+The core mapping selects 5QI values from the latency expectation for URLLC and the bandwidth expectation for eMBB. The RAN mapping independently derives S-NSSAI and priority from \texttt{sliceType}, and derives the minimum and maximum PRB policy ratios from \texttt{resourceShare}. Thus, \texttt{Full} and \texttt{Partial} are resource policies rather than fixed properties of URLLC and eMBB, even though the evaluation uses those pairings.
 
 The translation algorithm is deterministic. For each admitted intent group, it first resolves the service profile, then derives the core QoS tuple, then derives the RAN scheduling tuple, and finally verifies that both domains refer to the same S-NSSAI. This last check avoids a common configuration error in manual experiments: the core may admit a PDU session for one slice identifier while the RAN scheduler is configured for another. In the prototype, the SD value is stored in one normalized integer form inside the status field, even if an operator originally specified it in hexadecimal notation. The status field therefore becomes the common audit surface across the human-readable intent and the domain-specific configuration files.
 
@@ -117,7 +131,7 @@ Listing~\ref{lst:translation_algo} omits implementation details, but captures th
 \subsection{End-to-End Workflow}
 \label{subsec:e2e_workflow}
 
-The complete workflow has five stages. First, the orchestrator admits the intent by checking whether the requested slice classes and expectation fields are supported by the current policy table. Second, it translates the accepted intent into domain parameters. The output is deterministic for a given policy table, so an operator can inspect the status field and see which 5QI, QFI, SD, PRB ratio, and priority values were derived from the original request. Third, the RAN parameters are inserted into a Nephio package revision that is proposed and approved for GitOps delivery. Fourth, the core parameters are applied to free5GC subscriber and QoS configuration. Finally, the orchestrator observes domain status and updates the top-level fulfillment state.
+The complete workflow has five stages. First, the orchestrator admits the intent by checking whether the requested slice classes and expectation fields are supported by the current policy table. Second, it translates the accepted intent into domain parameters. The output is deterministic for a given policy table, so an operator can inspect the status field and see which 5QI, QFI, SD, PRB ratio, and priority values were derived from the original request. Third, the RAN parameters are inserted into a Nephio package revision that is proposed and approved for GitOps delivery. Fourth, the free5GC Operator reconciles the core NF deployment while subscriber and QoS parameters are applied through the core-facing interface. Finally, the orchestrator observes domain status and updates the top-level fulfillment state.
 
 This workflow separates intent handling from low-level deployment mechanics. A domain-specific failure does not require the consumer to understand Porch, Config Sync, free5GC subscriber records, or OCUDU ConfigMaps. Instead, the consumer sees a single status surface.
 
@@ -131,7 +145,7 @@ status:
   fulfillmentState: FULFILLED
   intentGroupStatuses:
     - id: embb
-      core: {fiveQI: 9, qfi: 9, state: CONFIGURED}
+      core: {fiveQI: 6, qfi: 6, state: CONFIGURED}
       ran:
         sst: 1
         sd: 66051
