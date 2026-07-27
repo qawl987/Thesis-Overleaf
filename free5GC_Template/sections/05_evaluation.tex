@@ -3,7 +3,7 @@
 
 The evaluation asks three questions:
 \begin{enumerate}
-  \item Can the system materialize an intent into consistent core and RAN slice configuration?
+  \item Can the system materialize an intent into consistent Core and RAN slice configuration?
   \item Does the generated RAN configuration differentiate eMBB and URLLC traffic?
   \item Where is orchestration time spent in the management path?
 \end{enumerate}
@@ -29,7 +29,7 @@ The testbed uses MicroK8s v1.28, Nephio R5, free5GC v4.2.1, OCUDU release 26.04,
   \end{tabular}
 \end{table}
 
-The evaluation uses two deployment modes because they answer different questions. The local mode removes Kubernetes and GitOps from the data path and establishes whether the generated RAN scheduling configuration has the intended qualitative effect. The cloud-native mode then verifies whether the same configuration can be produced through the proposed intent, Nephio, and operator pipeline. This separation is useful because a negative result in the cloud-native test could come from either an incorrect slice policy or from the deployment pipeline; the local baseline helps separate those causes.
+The evaluation uses two deployment modes because they answer different questions. The local mode removes Kubernetes and GitOps from the data path and evaluates whether the generated RAN scheduling configuration has the intended qualitative effect. The cloud-native mode then verifies whether the same configuration can be produced through the proposed intent, Nephio, and operator pipeline. This separation is useful because a negative result in the cloud-native test could come from either an incorrect slice policy or from the deployment pipeline; the local baseline helps separate those causes.
 
 The management cluster hosts the E2E orchestrator and Porch-facing package workflow. The workload cluster hosts Config Sync, the OCUDU Operator, Nephio's free5GC Operator, and their managed network functions. The orchestrator realizes the NSMF/intent-handler role, while the two domain operators realize RAN NSSMF and Core NSSMF/VNFM responsibilities. UE and traffic-generation components are treated as test resources rather than managed network functions.
 
@@ -61,7 +61,7 @@ The first experiment validates the generated slice configuration in a local envi
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{4.2.1-urllc-vs-embb.png}
+  \includegraphics[width=\linewidth]{iperf_new.png}
   \caption{Local eMBB and URLLC traffic behavior under the generated slice scheduling configuration}
   \Description{A time-series plot comparing eMBB and URLLC traffic across three phases. URLLC receives higher priority while both flows are active, and eMBB recovers after URLLC stops.}
   \label{fig:local_qos}
@@ -79,7 +79,7 @@ The second experiment runs the orchestration path through the Kubernetes and Nep
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{4.2.2-urllc-vs-embb.png}
+  \includegraphics[width=\linewidth]{iperf_new_nephio.png}
   \caption{Slice behavior after orchestration through the Nephio and Kubernetes workflow}
   \Description{A time-series plot showing that URLLC receives more throughput than eMBB during the overlap period in the Kubernetes-based testbed, though absolute throughput is lower than in the local environment.}
   \label{fig:k8s_qos}

@@ -5,19 +5,17 @@
   \centering
   \includegraphics[width=\textwidth]{3.1.1-arch.png}
   \caption{Intent-driven orchestration architecture for coordinating service-level slice intents with RAN and core-domain configuration}
-  \Description{A layered architecture with service consumer, E2E orchestrator, southbound interfaces, and domain execution components for OCUDU, free5GC, Nephio, GitOps, and Kubernetes operators.}
+  \Description{A three-domain architecture with a service consumer domain, an NSMF management domain, and an NSSMF workload domain for OCUDU, free5GC, Nephio, GitOps, and Kubernetes operators.}
   \label{fig:system_arch}
 \end{figure*}
 
-Figure~\ref{fig:system_arch} shows the proposed architecture. The system is divided into four logical layers.
+Figure~\ref{fig:system_arch} shows the proposed architecture. The system is organized into three domains that correspond to the labels in the figure.
 
-\textbf{Service consumer layer.} A consumer submits slice objectives to the Kubernetes API as \texttt{E2EQoSIntent} objects. The API server becomes the intent management interface. This choice avoids a separate northbound REST schema and allows all intent instances to inherit Kubernetes access control, versioning, and event semantics.
+\textbf{Service consumer domain.} A management-service consumer submits slice objectives to the Kubernetes API as \texttt{E2EQoSIntent} objects through the intent management interface. This choice avoids a separate northbound REST schema and allows all intent instances to inherit Kubernetes access control, versioning, and event semantics.
 
-\textbf{Intent orchestration layer.} The E2E orchestrator acts as an NSMF and intent handler. It watches intent resources, validates the requested service classes, translates the expectations into domain parameters, and records fulfillment state in the intent status. The orchestrator is implemented as a Kubernetes controller so that failed or partial operations can be retried through reconciliation.
+\textbf{NSMF domain.} The management cluster hosts the E2E orchestrator and the Nephio Porch/Kpt package pipeline. The E2E orchestrator acts as an NSMF and intent handler: it watches intent resources, validates the requested service classes, translates the expectations into domain parameters, and records fulfillment state in the intent status. For the RAN path, it uses Porch to copy, mutate, propose, and approve a package revision before GitOps synchronization. For the Core path, Nephio packages describe free5GC network-function deployment, while the orchestrator injects dynamic subscriber and QoS state through free5GC-facing logic. This hybrid design separates declarative NF lifecycle management from API-facing subscriber configuration.
 
-\textbf{Southbound interface layer.} The RAN and core domains are configured through different mechanisms. For RAN, the orchestrator uses Nephio Porch to copy, mutate, propose, and approve a package revision. The approved package is synchronized to the workload cluster by Config Sync. For the core, Nephio packages describe free5GC network-function deployment, while the orchestrator injects dynamic subscriber and QoS state through free5GC-facing logic. This hybrid design separates declarative NF lifecycle management from API-facing subscriber configuration.
-
-\textbf{Domain execution layer.} The workload cluster runs two domain controllers. The OCUDU Operator acts as the RAN NSSMF: it consumes cell, PLMN, and deployment resources, validates their relationships, renders gNB configuration, and reconciles the RAN workload. The official Nephio free5GC Operator acts as the Core NSSMF/VNFM: it watches \texttt{NFDeployment} resources and reconciles the free5GC network functions. Subscriber and QoS updates complement this lifecycle path through the core-facing interface. Both domains report status back to the orchestrator.
+\textbf{NSSMF domain.} The workload cluster contains the RAN NSSMF and Core NSSMF execution paths. The OCUDU Operator acts as the RAN NSSMF: it consumes cell, PLMN, and deployment resources, validates their relationships, renders gNB configuration, and reconciles the RAN workload. The official Nephio free5GC Operator acts as the Core NSSMF/VNFM: it watches \texttt{NFDeployment} resources and reconciles the free5GC network functions. Config Sync delivers the approved KRM resources into these domain controllers, and both domains report status back to the orchestrator. Subscriber and QoS updates complement the core lifecycle path through the core-facing interface.
 
 \subsection{Intent Model}
 
@@ -78,7 +76,7 @@ Table~\ref{tab:admission} shows the policy dimensions used by the implementation
 \subsection{Cross-Domain Translation}
 \label{subsec:translation}
 
-The translation engine maps intent expectations to concrete domain parameters. Table~\ref{tab:translation} summarizes the mappings used in the prototype. The exact values are policy choices rather than universal constants; the contribution is the translation structure and the ability to materialize it across free5GC and OCUDU.
+The translation engine maps intent expectations to concrete domain parameters. Table~\ref{tab:translation} summarizes the mappings used in the prototype. The exact values are policy choices rather than universal constants; they serve to demonstrate how one admitted intent can be projected consistently into both free5GC QoS settings and OCUDU RAN scheduling parameters.
 
 \begin{table}[t]
   \caption{Complete intent-to-configuration mapping}
