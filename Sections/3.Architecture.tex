@@ -172,6 +172,34 @@ data:
     \item \textbf{排程優先級 (Scheduling Priority)}：為確保在無線資源面臨競爭時，關鍵型業務能被優先排程，演算法為 URLLC 切片配置了極高的 MAC 層排程權重（\texttt{priority: 200}），而一般 eMBB 切片則配置為基礎權重（\texttt{priority: 10}）。
 \end{itemize}
 
+表 \ref{tab:intent_translation_mapping} 彙整轉譯引擎採用之完整映射規則。核心網之 5QI 由切片類型及其 SLA 指標共同決定；存取網之 S-NSSAI 與排程優先權由 \texttt{sliceType} 決定，而 PRB 上下限則獨立由 \texttt{resourceShare} 決定。
+
+\begin{table}[htbp]
+    \centering
+    \caption{意圖至 Core 與 RAN 網域參數之完整映射}
+    \label{tab:intent_translation_mapping}
+    \small
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lll}
+        \toprule
+        網域 & 意圖輸入 & 轉譯輸出 \\
+        \midrule
+        Core & URLLC, \texttt{latency=ultra-low} & 5QI 85 \\
+        Core & URLLC, \texttt{latency=low} & 5QI 82 \\
+        Core & URLLC, \texttt{latency=medium} & 5QI 84 \\
+        Core & eMBB, \texttt{bandwidth=dedicated-high} & 5QI 4 \\
+        Core & eMBB, \texttt{bandwidth=high} & 5QI 6 \\
+        Core & eMBB, \texttt{bandwidth=standard} & 5QI 9 \\
+        \midrule
+        RAN & URLLC & SST 1, SD 1122867 (\texttt{0x112233}), Priority 200 \\
+        RAN & eMBB & SST 1, SD 66051 (\texttt{0x010203}), Priority 10 \\
+        RAN & \texttt{resourceShare=Full} & PRB Ratio 0--100\% \\
+        RAN & \texttt{resourceShare=Partial} & PRB Ratio 0--50\% \\
+        \bottomrule
+    \end{tabular}
+    }
+\end{table}
+
 \subsection{RAN 子網域編排路徑：基於 Nephio Porch 之宣告式封裝工作流}
 \label{subsec:ran_orchestration_path}
 
