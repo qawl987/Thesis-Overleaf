@@ -10,7 +10,7 @@ The controller follows the standard Kubernetes reconciliation pattern. When an \
 This idempotent structure is important for GitOps integration. Porch and Config Sync may introduce asynchronous delay, and the Kubernetes API may deliver repeated events for the same resource version. The orchestrator therefore treats every reconciliation as a convergence attempt rather than a one-shot command. A failed stage records a reason and is retried according to the controller runtime backoff policy.
 
 \begin{table}[t]
-  \caption{Controller stages and observable artifacts.}
+  \caption{Controller stages and observable artifacts}
   \label{tab:controller_stages}
   \begin{tabular}{lll}
     \toprule
@@ -33,7 +33,7 @@ For the RAN path, the orchestrator uses Nephio Porch as the package control poin
 
 Listing~\ref{lst:ran_mutation} shows the resulting RAN slice configuration. The eMBB slice uses SD \texttt{0x010203}, a maximum PRB policy ratio of 50, and priority 10. The URLLC slice uses SD \texttt{0x112233}, a maximum PRB policy ratio of 100, and priority 200.
 
-\begin{lstlisting}[caption={Mutated OCUDU slice configuration generated from intent translation.}, label={lst:ran_mutation}]
+\begin{lstlisting}[caption={Mutated OCUDU slice configuration generated from intent translation}, label={lst:ran_mutation}]
 spec:
   slicing:
     - sst: 1
@@ -55,7 +55,7 @@ After synchronization, the OCUDU Operator renders the final \texttt{gnb-config.y
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{2.2.3-nephio-workflow-new.png}
-  \caption{Nephio-style package workflow used by the RAN orchestration path.}
+  \caption{Nephio-style package workflow used by the RAN orchestration path}
   \Description{A package workflow from management cluster package mutation through Git synchronization to workload cluster application.}
   \label{fig:nephio_workflow}
 \end{figure}
@@ -84,7 +84,7 @@ The implementation treats this path as a compatibility layer rather than a perma
 
 The OCUDU Operator performs reference walking across these resources. Starting from the deployment resource, it resolves the referenced application, cell, and PLMN objects, validates that the referenced slices are mutually consistent, and then renders the final gNB configuration. When rendering succeeds, it updates Kubernetes resources and marks the deployment as ready. When a referenced object is missing or inconsistent, it records a condition instead of producing a partial configuration. This local check is separate from the E2E orchestrator's admission policy and protects the workload cluster from broken package content.
 
-\begin{lstlisting}[caption={Representative rendered scheduler fragment.}, label={lst:rendered_scheduler}]
+\begin{lstlisting}[caption={Representative rendered scheduler fragment}, label={lst:rendered_scheduler}]
 cell_cfg:
   slicing:
     - sst: 1

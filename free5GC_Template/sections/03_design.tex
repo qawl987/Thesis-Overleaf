@@ -1,13 +1,13 @@
 ﻿\section{System Design}
 \label{sec:design}
 
-\begin{figure}[t]
+\begin{figure*}[t]
   \centering
-  \includegraphics[width=\linewidth]{3.1.1-arch.png}
-  \caption{Intent-driven orchestration architecture for coordinating service-level slice intents with RAN and core-domain configuration.}
+  \includegraphics[width=\textwidth]{3.1.1-arch.png}
+  \caption{Intent-driven orchestration architecture for coordinating service-level slice intents with RAN and core-domain configuration}
   \Description{A layered architecture with service consumer, E2E orchestrator, southbound interfaces, and domain execution components for OCUDU, free5GC, Nephio, GitOps, and Kubernetes operators.}
   \label{fig:system_arch}
-\end{figure}
+\end{figure*}
 
 Figure~\ref{fig:system_arch} shows the proposed architecture. The system is divided into four logical layers.
 
@@ -23,7 +23,7 @@ Figure~\ref{fig:system_arch} shows the proposed architecture. The system is divi
 
 Listing~\ref{lst:input_intent} illustrates the intent interface. One resource can contain multiple intent groups so that related slices can be reconciled together. Each group contains context, such as target UEs, and expectations, such as slice type, latency, bandwidth, and resource sharing.
 
-\begin{lstlisting}[caption={Example \texttt{E2EQoSIntent} submitted by a consumer.}, label={lst:input_intent}]
+\begin{lstlisting}[caption={Example \texttt{E2EQoSIntent} submitted by a consumer}, label={lst:input_intent}]
 apiVersion: e2e.intent.domain/v1alpha1
 kind: E2EQoSIntent
 metadata:
@@ -56,7 +56,7 @@ An intent interface must reject requests that the current deployment cannot safe
 This distinction keeps the CRD stable while allowing operator policy to evolve. For example, the CRD can accept a general \texttt{latency} expectation, but a particular deployment may only admit \texttt{ultra-low} latency for a small set of URLLC service profiles. Similarly, a tenant may be allowed to request \texttt{Partial} sharing but not \texttt{Full} sharing. The current prototype implements a compact policy table for two service classes, eMBB and URLLC, because these classes are sufficient to exercise both throughput-oriented and latency-sensitive translation paths.
 
 \begin{table}[t]
-  \caption{Admission policy used in the prototype.}
+  \caption{Admission policy used in the prototype}
   \label{tab:admission}
   \resizebox{\columnwidth}{!}{%
   \begin{tabular}{lll}
@@ -81,7 +81,7 @@ Table~\ref{tab:admission} shows the policy dimensions used by the implementation
 The translation engine maps intent expectations to concrete domain parameters. Table~\ref{tab:translation} summarizes the mappings used in the prototype. The exact values are policy choices rather than universal constants; the contribution is the translation structure and the ability to materialize it across free5GC and OCUDU.
 
 \begin{table}[t]
-  \caption{Complete intent-to-configuration mapping.}
+  \caption{Complete intent-to-configuration mapping}
   \label{tab:translation}
   \scriptsize
   \resizebox{\columnwidth}{!}{%
@@ -109,7 +109,7 @@ The core mapping selects 5QI values from the latency expectation for URLLC and t
 
 The translation algorithm is deterministic. For each admitted intent group, it first resolves the service profile, then derives the core QoS tuple, then derives the RAN scheduling tuple, and finally verifies that both domains refer to the same S-NSSAI. This last check avoids a common configuration error in manual experiments: the core may admit a PDU session for one slice identifier while the RAN scheduler is configured for another. In the prototype, the SD value is stored in one normalized integer form inside the status field, even if an operator originally specified it in hexadecimal notation. The status field therefore becomes the common audit surface across the human-readable intent and the domain-specific configuration files.
 
-\begin{lstlisting}[caption={Simplified translation procedure.}, label={lst:translation_algo}]
+\begin{lstlisting}[caption={Simplified translation procedure}, label={lst:translation_algo}]
 for group in intent.spec.intentGroups:
   profile = admit(group.expectations)
   core = {
@@ -139,7 +139,7 @@ This workflow separates intent handling from low-level deployment mechanics. A d
 
 The orchestrator writes translated parameters and domain status into the CRD status field. This follows the Kubernetes convention that \texttt{spec} is desired state and \texttt{status} is observed state. A typical fulfillment record includes the translated core and RAN parameters, the observed generation, and per-domain states such as \texttt{CONFIGURED}, \texttt{DEGRADED}, or \texttt{FAILED}. This status path is important because intent-driven management requires not only execution but also a machine-readable statement of whether the requested outcome is fulfilled.
 
-\begin{lstlisting}[caption={Representative intent status after translation and domain observation.}, label={lst:intent_status}]
+\begin{lstlisting}[caption={Representative intent status after translation and domain observation}, label={lst:intent_status}]
 status:
   observedGeneration: 3
   fulfillmentState: FULFILLED

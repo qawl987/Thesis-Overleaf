@@ -18,7 +18,7 @@ Nephio extends this model with KRM packages, Porch package revisions, and GitOps
 Prior work on intent-based and autonomous network management proposes architectures for translating service objectives into network behavior~\cite{chirivella2023e2e,martini2023intent,tran2024ina,antonakoglou2025camino,nahum2025intent}. Recent work also studies GitOps performance~\cite{ghosh2025performance}. The remaining gap is an end-to-end prototype connecting intent submission, cross-domain translation, Nephio package workflows, RAN and core NSSMF reconciliation, free5GC QoS configuration, and experimental validation.
 
 \begin{table}[t]
-  \caption{Positioning of this work relative to open-source slice-management building blocks.}
+  \caption{Positioning of this work relative to open-source slice-management building blocks}
   \label{tab:positioning}
   \begin{tabular}{p{0.20\linewidth}p{0.30\linewidth}p{0.34\linewidth}}
     \toprule
@@ -28,8 +28,9 @@ Prior work on intent-based and autonomous network management proposes architectu
     OCUDU & RAN and slice scheduler parameters & Requires low-level scheduler configuration \\
     Kubernetes & Declarative API and reconciliation & Needs telecom-specific translation logic \\
     Nephio & Package lifecycle and free5GC Operator & Needs intent-derived RAN mutation \\
+    E2E Orchestrator & Intent translation and cross-domain coordination & Bridges service intent to RAN and core configuration \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:positioning} highlights the design premise. Each component solves part of the deployment problem, but none provides a complete path from service intent to realized RAN and core configuration. The E2E orchestrator connects their control surfaces; the OCUDU and free5GC Operators then serve as the RAN and core domain reconcilers, respectively.
+Table~\ref{tab:positioning} positions this work relative to the open-source slice-management building blocks used in the prototype. free5GC and OCUDU expose the core and RAN controls needed to realize a slice, while Kubernetes and Nephio provide declarative APIs, package revision, and GitOps delivery. These components are necessary building blocks, but they operate at different abstraction levels and do not by themselves translate a service-level slice request into consistent RAN and core settings. The E2E orchestrator is therefore relevant as the missing NSMF-like coordination layer: it accepts the intent, derives aligned 5QI/QFI, S-NSSAI, PRB-ratio, and priority parameters, mutates the RAN package, triggers the core-facing QoS configuration path, and records whether both domains converge to the requested slice behavior.

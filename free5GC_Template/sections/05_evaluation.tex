@@ -13,7 +13,7 @@ The evaluation asks three questions:
 The testbed uses MicroK8s v1.28, Nephio R5, free5GC v4.2.1, OCUDU release 26.04, and an srsUE-based emulation environment. The management and workload clusters run in a virtualized environment with 10 vCPUs and 32 GB of memory. A separate local environment is used to validate the data-plane behavior of the generated OCUDU configuration. Traffic measurements use \texttt{iperf3} UDP flows~\cite{iperf3_manual}.
 
 \begin{table}[t]
-  \caption{Software components used in the prototype.}
+  \caption{Software components used in the prototype}
   \label{tab:software}
   \begin{tabular}{ll}
     \toprule
@@ -40,7 +40,7 @@ The evaluation separates data-plane and management-plane metrics. The data-plane
 For management-plane latency, the most relevant question is not only total time but also the distribution across stages. A long delay inside the orchestrator would suggest inefficient translation or API use. A long delay inside GitOps synchronization suggests a trade-off between auditability and actuation speed. A long delay inside the OCUDU Operator would indicate domain-specific rendering or rollout overhead.
 
 \begin{table}[t]
-  \caption{Traffic model for data-plane experiments.}
+  \caption{Traffic model for data-plane experiments}
   \label{tab:traffic_model}
   \begin{tabular}{llll}
     \toprule
@@ -62,7 +62,7 @@ The first experiment validates the generated slice configuration in a local envi
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{4.2.1-urllc-vs-embb.png}
-  \caption{Local eMBB and URLLC traffic behavior under the generated slice scheduling configuration.}
+  \caption{Local eMBB and URLLC traffic behavior under the generated slice scheduling configuration}
   \Description{A time-series plot comparing eMBB and URLLC traffic across three phases. URLLC receives higher priority while both flows are active, and eMBB recovers after URLLC stops.}
   \label{fig:local_qos}
 \end{figure}
@@ -80,7 +80,7 @@ The second experiment runs the orchestration path through the Kubernetes and Nep
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{4.2.2-urllc-vs-embb.png}
-  \caption{Slice behavior after orchestration through the Nephio and Kubernetes workflow.}
+  \caption{Slice behavior after orchestration through the Nephio and Kubernetes workflow}
   \Description{A time-series plot showing that URLLC receives more throughput than eMBB during the overlap period in the Kubernetes-based testbed, though absolute throughput is lower than in the local environment.}
   \label{fig:k8s_qos}
 \end{figure}
@@ -96,7 +96,7 @@ In the Kubernetes testbed, the maximum stable offered rate is lower than in the 
 After each orchestration run, we verify fulfillment at three levels. First, the intent status must contain the translated parameters for each intent group. Second, the RAN package in the workload cluster must contain the intended S-NSSAI, PRB ratio, and priority. Third, the generated OCUDU ConfigMap must contain the corresponding scheduler configuration. Table~\ref{tab:verification} summarizes these checks.
 
 \begin{table}[t]
-  \caption{Fulfillment checks after applying the two-slice intent.}
+  \caption{Fulfillment checks after applying the two-slice intent}
   \label{tab:verification}
   \begin{tabular}{lll}
     \toprule
@@ -124,13 +124,13 @@ We measure orchestration latency by recording four timestamps: $T_0$, when the \
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{4.3.2-latency.png}
-  \caption{Management-plane latency distribution across orchestration stages.}
+  \caption{Management-plane latency distribution across orchestration stages}
   \Description{A latency plot showing that GitOps synchronization dominates total orchestration time, while operator reconciliation is short.}
   \label{fig:latency}
 \end{figure}
 
 \begin{table}[t]
-  \caption{Representative orchestration latency sample.}
+  \caption{Representative orchestration latency sample}
   \label{tab:latency}
   \begin{tabular}{lr}
     \toprule
